@@ -1,9 +1,13 @@
 ;; -*- lexical-binding: t -*-
 
-(require 'gamegrid)
+(eval-when-compile (require 'cl))
+
+;; (require 'gamegrid)
 (require 'nes-util)
 (require 'nes-color)
 (require 'nes-interrupt)
+
+(require 'retro)
 
 (defconst nes/ppu:SCREEN-WIDTH 256)
 (defconst nes/ppu:SCREEN-HEIGHT 240)
@@ -31,70 +35,16 @@
 
 (defconst nes/ppu:SPRITE-RAM-BYTESIZE #x0100)
 
-;;
-;; This library does not use gamegrid-set-face(10)
-;;
-;; Explain it using the following example.
-;;
-;;   (defvar sample-10-options
-;;     '(((glyph colorize)
-;;        (t ?.))
-;;       ((color-x color-x)
-;;        (mono-x grid-x)
-;;        (color-tty color-tty))
-;;       (((glyph color-x) [1 0 0])
-;;        (color-tty "red"))))
-;;
-;;   (defun sample-display-options ()
-;;     (let ((options (make-vector 256 nil)))
-;;       (dotimes (c 256)
-;;         (aset options c
-;;               (cond ((= c 1)
-;;                      sample-1-options)
-;;                     ((= c 2)
-;;                      sample-2-options)
-;;                     ;;
-;;                     ;; skip
-;;                     ;;
-;;                     ((= c 10)
-;;                      sample-10-options)
-;;                     (t '(nil nil nil)))))
-;;       options))
-;;
-;;   (gamegrid-init (sample-display-options))
-;;
-;;   1. gamegrid creates a dedicated display-table ( `bufefer-display-table' )
-;;
-;;   2. In the case of the above example:
-;;
-;;        (aref buffer-display-table 10) ;; => [46] ( ?. )
-;;
-;;   3. This means, 10 (C-j) replaces 46 (.).
-;;
-;;   4. As a result, screen collapse!!!
-;;
-;;        before
-;;
-;;          **********
-;;          **********
-;;          **********
-;;          **********
-;;
-;;        after
-;;
-;;          **********.**********.**********.**********
-;;
-;;
 (defconst nes/ppu:COLOR-START-OFFSET 11)
 
-(defstruct (nes/ppu-bus
-            (:conc-name nes/ppu-bus->))
+(cl-defstruct (nes/ppu-bus
+               (:conc-name nes/ppu-bus->))
   (video-ram (make-vector #x2000 0))
   character-ram ;; vector
   )
 
-(defstruct (nes/ppu
-            (:conc-name nes/ppu->))
+(cl-defstruct (nes/ppu
+               (:conc-name nes/ppu->))
   (cycle 0)
   (line 0)
   (bus (make-nes/ppu-bus))
@@ -103,6 +53,8 @@
   (scroll-x 0)
   (scroll-y 0)
   (interrupt nil)
+  (current-canvas nil)
+  (empty-canvas nil)
 
   ;; Background temporary variables
   (name-table-byte 0)
@@ -255,7 +207,7 @@
 (defsubst nes/ppu--write-oam-data (ppu value)
   (let ((addr (nes/ppu->sprite-ram-addr ppu)))
     (aset (nes/ppu->sprite-ram ppu) addr value)
-    (setf (nes/ppu->sprite-ram-addr ppu) (logand (incf addr) #xFF))))
+    (setf (nes/ppu->sprite-ram-addr ppu) (logand (cl-incf addr) #xFF))))
 
 ;;
 ;; https://wiki.nesdev.com/w/index.php/PPU_scrolling#Register_controls
@@ -331,7 +283,7 @@
         (setq return-value read-value)
         (setf (nes/ppu->buffered-data ppu) (nes/ppu--bus-read bus (- vram-address #x1000)))))
 
-    (incf (nes/ppu->v ppu) (nes/ppu--vram-address-increment-offset ppu))
+    (cl-incf (nes/ppu->v ppu) (nes/ppu--vram-address-increment-offset ppu))
     return-value))
 
 ;;
@@ -341,7 +293,7 @@
 ;;
 (defsubst nes/ppu--write-data (ppu value)
   (nes/ppu--bus-write ppu (nes/ppu->v ppu) value)
-  (incf (nes/ppu->v ppu) (nes/ppu--vram-address-increment-offset ppu)))
+  (cl-incf (nes/ppu->v ppu) (nes/ppu--vram-address-increment-offset ppu)))
 
 (defun nes/ppu--read-from-sprite-ram (p index)
   (aref (nes/ppu->sprite-ram p) index))
@@ -366,7 +318,12 @@
          (pre-fetch-cycle-p (<= 321 cycle 336))
          (visible-cycle-p (<= 1 cycle 256))
          (fetch-cycle-p (or pre-fetch-cycle-p visible-cycle-p))
+         (current-canvas (nes/ppu->current-canvas ppu))
+         (empty-canvas (nes/ppu->empty-canvas ppu))
          )
+
+    ;; (cl-assert current-canvas)
+    ;; (cl-assert empty-canvas)
 
     (when rendering-enabled-p
       ;;
@@ -376,10 +333,10 @@
         (nes/ppu--render-pixel ppu))
 
       (when (and render-line-p fetch-cycle-p)
-        (setf (nes/ppu->tile-data2 ppu) (logior (logand #xFFFFFFF0 (lsh (nes/ppu->tile-data2 ppu) 4))
-                                                (logand (lsh (nes/ppu->tile-data1 ppu) -28) #b1111)))
-        (setf (nes/ppu->tile-data1 ppu) (logand #xFFFFFFFF (lsh (nes/ppu->tile-data1 ppu) 4)))
-        (case (% cycle 8)
+        (setf (nes/ppu->tile-data2 ppu) (logior (logand #xFFFFFFF0 (ash (nes/ppu->tile-data2 ppu) 4))
+                                                (logand (ash (nes/ppu->tile-data1 ppu) -28) #b1111)))
+        (setf (nes/ppu->tile-data1 ppu) (logand #xFFFFFFFF (ash (nes/ppu->tile-data1 ppu) 4)))
+        (cl-case (% cycle 8)
           (1 (nes/ppu--fetch-current-name-table-byte ppu))
           (3 (nes/ppu--fetch-current-attribute-table-byte ppu))
           (5 (nes/ppu--fetch-current-tile-low-byte ppu))
@@ -395,6 +352,7 @@
         (when (eq cycle 256)
           (nes/ppu--increment-y ppu))
         (when (eq cycle 257)
+          ;; (retro--buffer-render current-canvas empty-canvas)
           (nes/ppu--copy-x ppu)))
 
       ;; sprite logic
@@ -405,6 +363,9 @@
       )
 
     (when (and (eq scanline 241) (eq cycle 1))
+      (retro--buffer-render current-canvas empty-canvas)
+      (retro--reset-canvas empty-canvas)
+      (cl-rotatef (nes/ppu->current-canvas ppu) (nes/ppu->empty-canvas ppu))
       (nes/ppu--set-vblank ppu))
 
     (when (and pre-render-line-p (eq cycle 1))
@@ -416,7 +377,7 @@
 
 (defun* nes/ppu--tick (ppu)
   (when (> (nes/ppu->nmi-delay ppu) 0)
-    (decf (nes/ppu->nmi-delay ppu))
+    (cl-decf (nes/ppu->nmi-delay ppu))
     (when (and (zerop (nes/ppu->nmi-delay ppu))
                (nes/ppu--generate-nmi-p ppu)
                (nes/ppu--vblank-p ppu))
@@ -430,16 +391,16 @@
       (setf (nes/ppu->cycle ppu) 0)
       (setf (nes/ppu->line ppu) 0)
       (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1))
-      (return-from nes/ppu--tick)))
+      (cl-return-from nes/ppu--tick)))
 
-  (incf (nes/ppu->cycle ppu))
+  (cl-incf (nes/ppu->cycle ppu))
 
   (let ((right-end-cycle-p (>= (nes/ppu->cycle ppu) nes/ppu:CYCLES-PER-LINE))
         (bottom-end-line-p (>= (nes/ppu->line ppu) (+ nes/ppu:SCREEN-HEIGHT nes/ppu:VBLANK-HEIGHT)))
         )
   (when right-end-cycle-p
     (setf (nes/ppu->cycle ppu) 0)
-    (incf (nes/ppu->line ppu))
+    (cl-incf (nes/ppu->line ppu))
     (when bottom-end-line-p
       (setf (nes/ppu->line ppu) 0)
       (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1)))
@@ -626,7 +587,7 @@
             (aset (nes/ppu->sprite-positions ppu) count x)
             (aset (nes/ppu->sprite-priorities ppu) count sprite-priority-p)
             (aset (nes/ppu->sprite-indexes ppu) count i))
-          (incf count)
+          (cl-incf count)
           )))
 
       (when (> count 8)
@@ -655,8 +616,8 @@
         ;; if bottom half
         ;;
         (when (> row 7)
-          (incf tile)
-          (decf row 8)))
+          (cl-incf tile)
+          (cl-decf row 8)))
       )
 
     ;;
@@ -676,6 +637,9 @@
 (defun nes/ppu--render-pixel (ppu)
   (let* ((x (nes/ppu--current-x ppu))
          (y (nes/ppu--current-y ppu))
+         (canvas (nes/ppu->current-canvas ppu))
+         (pixels (retro-canvas-pixels canvas))
+         (width (retro-canvas-width canvas))
 
          ;;
          ;; bg-color-index == 0 means `Universal background color`
@@ -715,14 +679,18 @@
                         (if (aref (nes/ppu->sprite-priorities ppu) sp-index)
                             (logior sp-color-index #x10)
                           bg-color-index)))
-                      )
+                      ))
+    (retro--plot-pixel
+     x
+     y
+     (nes/ppu--read-from-palette-table ppu color-index)
+     pixels
+     width)))
 
-         )
-    (nes/ppu--image-write x y (nes/ppu--read-from-palette-table ppu color-index))
-  ))
-
-(defun nes/ppu--image-write (x y color)
-  (nes/ppu--render-set-cell x y color))
+;; (defun nes/ppu--image-write (x y c p w)
+;;   (retro--plot-pixel x y c p w)
+;;     ;; (nes/ppu--render-set-cell x y color)
+;;   )
 
 (defun nes/ppu--get-current-background-palette-index (ppu)
   (if (nes/ppu--background-enabled-p ppu)
@@ -805,7 +773,7 @@
   (logand (nes/ppu->v ppu) #b0000000000011111))
 
 (defsubst nes/ppu--increment-coarse-x-scroll (ppu)
-  (incf (nes/ppu->v ppu)))
+  (cl-incf (nes/ppu->v ppu)))
 
 (defsubst nes/ppu--clear-coarse-x-scroll (ppu)
   (setf (nes/ppu->v ppu) (logand (nes/ppu->v ppu) #b1111111111100000)))
@@ -824,7 +792,7 @@
   (setf (nes/ppu->v ppu) (logand (nes/ppu->v ppu) #b1000111111111111)))
 
 (defsubst nes/ppu--increment-fine-y-scroll (ppu)
-  (incf (nes/ppu->v ppu) #b0001000000000000))
+  (cl-incf (nes/ppu->v ppu) #b0001000000000000))
 
 (defsubst nes/ppu--toggle-horizontal-name-table-select (ppu)
   (setf (nes/ppu->v ppu) (logxor (nes/ppu->v ppu) #b0000010000000000)))
@@ -832,34 +800,64 @@
 (defsubst nes/ppu--toggle-vertical-name-table-select (ppu)
   (setf (nes/ppu->v ppu) (logxor (nes/ppu->v ppu) #b0000100000000000)))
 
-(defun nes/ppu--display-options ()
-  (let ((options (make-vector 256 '(nil nil nil))))
-    (dotimes (i (length nes/colors))
-      (aset options (+ i nes/ppu:COLOR-START-OFFSET) (aref nes/colors i)))
-    options))
+;; (defun nes/ppu--display-options ()
+;;   (let ((options (make-vector 256 '(nil nil nil))))
+;;     (dotimes (i (length nes/colors))
+;;       (aset options (+ i nes/ppu:COLOR-START-OFFSET) (aref nes/colors i)))
+;;     options))
 
-(defun nes/ppu--render-set-cell (x y c)
-  "see `gamegrid-set-cell'
+(defun nes/ppu--init-retro-colors ()
+  "Initialize retro palette with nes colors."
+  ;; (retro--init-color-palette nes/color:COLORS nes/ppu:COLOR-START-OFFSET)
+  (retro--init-color-palette nes/color:COLORS 0)
+  )
 
-In this library, `insert-char' and `delete-char' are not necessary in set-cell.
-Because all grid uses only `? '
-"
-  (save-excursion
-    (let ((buffer-read-only nil))
-      (goto-char (1+ (gamegrid-cell-offset x y)))
-      (gamegrid-set-face (+ c nes/ppu:COLOR-START-OFFSET)))))
+;; ;;; TODO: plot single pixel (x,y) with color (c)
+;; ;;; TODO: what kind of color is c
+;; (defun nes/ppu--render-set-cell (x y c p w)
+;;   (retro--plot-pixel x y c p w)
+;;   ;; (save-excursion
+;;   ;;   (let ((buffer-read-only nil))
+;;   ;;     (goto-char (1+ (gamegrid-cell-offset x y)))
+;;   ;;     (gamegrid-set-face (+ c nes/ppu:COLOR-START-OFFSET))))
+;;   )
 
+;; TODO: initialize retro buffer
 (defun nes/ppu-init (buffer-name)
   (select-window (or (get-buffer-window buffer-name)
                      (selected-window)))
+  ;; TODO: initialize retro
+  (nes/ppu--init-retro-colors)
   (switch-to-buffer buffer-name)
-  (setq show-trailing-whitespace nil)
-  (setq gamegrid-use-color t)
-  (setq gamegrid-use-glyphs nil)
-  (gamegrid-init-buffer nes/ppu:SCREEN-WIDTH
-                        nes/ppu:SCREEN-HEIGHT
-                        ? )
-  (gamegrid-init (nes/ppu--display-options)))
+  (let* ((window (selected-window))
+         (calibration (retro--calibrate-canvas-in-window
+                       nes/ppu:SCREEN-WIDTH
+                       nes/ppu:SCREEN-HEIGHT
+                       window))
+         (pixel-size (nth 0 calibration))
+         (window-width (nth 1 calibration))
+         (window-height (nth 2 calibration))
+         (background-color 13))
+    (face-remap-add-relative 'default :family retro-square-font-family :height pixel-size)
+    (let* ((margin-top (/ (- window-height nes/ppu:SCREEN-HEIGHT) 2))
+           (margin-left (/ (- window-width nes/ppu:SCREEN-WIDTH) 2))
+           (canvas (retro-canvas-create :margin-left margin-left
+                                        :margin-top margin-top
+                                        :width nes/ppu:SCREEN-WIDTH
+                                        :height nes/ppu:SCREEN-HEIGHT
+                                        :background-color background-color))
+           (margin-top-string (propertize (make-string (+ margin-left nes/ppu:SCREEN-WIDTH) 32) 'face 'default))
+           (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
+           (canvas-string (propertize (make-string nes/ppu:SCREEN-WIDTH 32) 'face (aref retro-palette-faces background-color))))
+      (dotimes (_ margin-top)
+        (insert margin-top-string)
+        (insert "\n"))
+      (dotimes (_ nes/ppu:SCREEN-HEIGHT)
+        (insert margin-left-string)
+        (insert canvas-string)
+        (insert "\n"))
+      (setq-local buffer-read-only t)
+      canvas)))
 
 (defun nes/ppu-set-character-ram (ppu ram)
   (setf (nes/ppu-bus->character-ram (nes/ppu->bus ppu)) ram))
