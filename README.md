@@ -53,7 +53,7 @@ with a few glitches but was extremely slow.
 I was able to integrate [retro.el](https://github.com/gabrielelana/retro.el) and obtained a
 significant (10x) speed up but it wasn't enough to make it playable.
 
-Then the journey begun to make it correct and performant as possible.
+Then the journey begun to make it as correct and performant as possible.
 
 ## Self-Promotion
 
