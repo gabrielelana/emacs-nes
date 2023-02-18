@@ -291,6 +291,8 @@
 (aset nes/instruction:MAP #x63 (make-nes/instruction :func #'nes/instruction-rra :name "RRA" :mode :pre-indexed-indirect))
 (aset nes/instruction:MAP #x73 (make-nes/instruction :func #'nes/instruction-rra :name "RRA" :mode :post-indexed-indirect))
 
+(provide 'nes-instruction)
+
 ;; Responding to recursive calls from nes-cpu
 (require 'nes-cpu)
 
@@ -858,7 +860,5 @@
           (= (logand operated #xFF) 0))
     (setf (nes/cpu-register->acc reg) (logand operated #xFF))
     (nes/cpu-write c addr data)))
-
-(provide 'nes-instruction)
 
 ;;; nes-instruction.el ends here
