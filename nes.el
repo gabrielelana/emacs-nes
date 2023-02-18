@@ -1,6 +1,36 @@
-;; -*- lexical-binding: t -*-
+;;; nes.el --- A NES Emulator written in Emacs Lisp running in Emacs -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+;; Author: Gabriele Lana <gabriele.lana@gmail.com>
+;; Maintainer: Gabriele Lana <gabriele.lana@gmail.com>
+;; Version: 0.0.1
+;; Package-Requires: ((emacs "28.1") (ht "2.0.0") (retro.el "0.0.1"))
+;; Homepage: http://github.com/gabrielelana/nes.el
+;; Keywords: NES, emulator
+
+;; This is a fork of emacs-nes.el wrote by Wataru MIYAGUNI.
+
+;; This file is not part of GNU Emacs
+
+;; This file is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation; either version 3, or (at your option)
+;; any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; For a full copy of the GNU General Public License
+;; see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; Library to create retro games in Emacs.
+
+;;; Code:
+
+(eval-when-compile (require 'cl-lib))
 
 (require 'nes-cartridge)
 (require 'nes-ppu)
@@ -33,10 +63,10 @@
   (interrupt nil)
   (canvas nil))
 
-;;; this is am hack, for retro we need to have two canvas, the current and the
+;;; This is an hack, for retro we need to have two canvas, the current and the
 ;;; previous, this is needed to enable some optimizations, in emacs-nes we don't
 ;;; know when a frame has been completely drawn therefore we are don't know when
-;;; to swapt current canvas and previous canvas, then we are keeping and empty
+;;; to swap current canvas and previous canvas, then we are keeping and empty
 ;;; canvas to be always used as previous canvas
 (defconst *EMTPY-CANVAS* nil)
 
@@ -127,4 +157,7 @@
 
 (provide 'nes)
 
+;; Local Variables:
+;; coding: utf-8
+;; End:
 ;;; nes.el ends here
