@@ -124,7 +124,8 @@
    ((or (eq addr #x3F10)
         (eq addr #x3F14)
         (eq addr #x3F18)
-        (eq addr #x3F1C)) (nes/ppu--bus-write b (- addr #x0010) value))          ;; mirror to #x3F00, #x3F04, #x3F08 and #x3F0C
+        (eq addr #x3F1C))
+    (nes/ppu--bus-write b (- addr #x0010) value))          ;; mirror to #x3F00, #x3F04, #x3F08 and #x3F0C
    ((<= addr #x3F1F) (aset (nes/ppu-bus->video-ram b) (- addr #x2000) value))
    ((<= addr #x3FFF) (nes/ppu--bus-write b (- addr #x0020) value))               ;; mirror to #x3F00 - #x3F1F
    ;; (t 0)
