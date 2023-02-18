@@ -856,7 +856,16 @@
         (insert margin-left-string)
         (insert canvas-string)
         (insert "\n"))
-      (setq-local buffer-read-only t)
+      (setq-local buffer-read-only t
+                  visible-cursor nil
+                  cursor-type nil
+                  inhibit-modification-hooks t
+                  inhibit-compacting-font-caches t
+                  bidi-inhibit-bpa t
+                  bidi-display-reordering nil
+                  bidi-paragraph-direction 'left-to-right
+                  buffer-read-only nil
+                  mode-line-format nil)
       canvas)))
 
 (defun nes/ppu-set-character-ram (ppu ram)
