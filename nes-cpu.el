@@ -254,8 +254,7 @@
          (add-cycle (cdr operand-and-cycle)))
     (setf (nes/cpu->cycles c) 0)
     (funcall (nes/instruction->func inst) c operand (nes/instruction->mode inst))
-    (+ (nes/cpu->cycles c) inst-cycle add-cycle)
-    ))
+    (+ (nes/cpu->cycles c) inst-cycle add-cycle)))
 
 (defun nes/cpu-init (c)
   (nes/cpu-reset c))
