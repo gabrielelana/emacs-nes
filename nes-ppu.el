@@ -375,29 +375,28 @@
                (nes/ppu--vblank-p ppu))
       (nes/interrupt-assert-nmi (nes/ppu->interrupt ppu))))
 
-  (when (or (nes/ppu--background-enabled-p ppu)
-            (nes/ppu--sprite-enabled-p ppu))
-    (when (and (eq (nes/ppu->f ppu) 1)
-               (eq (nes/ppu->line ppu) 261)
-               (eq (nes/ppu->cycle ppu) 339))
-      (setf (nes/ppu->cycle ppu) 0)
-      (setf (nes/ppu->line ppu) 0)
-      (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1))
-      (cl-return-from nes/ppu--tick)))
+  (if (and
+       (or (nes/ppu--background-enabled-p ppu)
+           (nes/ppu--sprite-enabled-p ppu))
+       (and (eq (nes/ppu->f ppu) 1)
+            (eq (nes/ppu->line ppu) 261)
+            (eq (nes/ppu->cycle ppu) 339)))
+      (progn
+        (setf (nes/ppu->cycle ppu) 0)
+        (setf (nes/ppu->line ppu) 0)
+        (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1)))
 
-  (cl-incf (nes/ppu->cycle ppu))
+    (cl-incf (nes/ppu->cycle ppu))
 
-  (let ((right-end-cycle-p (>= (nes/ppu->cycle ppu) nes/ppu:CYCLES-PER-LINE))
-        (bottom-end-line-p (>= (nes/ppu->line ppu) (+ nes/ppu:SCREEN-HEIGHT nes/ppu:VBLANK-HEIGHT)))
-        )
-  (when right-end-cycle-p
-    (setf (nes/ppu->cycle ppu) 0)
-    (cl-incf (nes/ppu->line ppu))
-    (when bottom-end-line-p
-      (setf (nes/ppu->line ppu) 0)
-      (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1)))
-    ))
-  )
+    (let ((right-end-cycle-p (>= (nes/ppu->cycle ppu) nes/ppu:CYCLES-PER-LINE))
+          (bottom-end-line-p (>= (nes/ppu->line ppu) (+ nes/ppu:SCREEN-HEIGHT nes/ppu:VBLANK-HEIGHT))))
+      (when right-end-cycle-p
+        (setf (nes/ppu->cycle ppu) 0)
+        (cl-incf (nes/ppu->line ppu))
+        (when bottom-end-line-p
+          (setf (nes/ppu->line ppu) 0)
+          (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1)))))))
+
 
 ;;
 ;; https://wiki.nesdev.com/w/index.php/PPU_scrolling#At_dot_257_of_each_scanline

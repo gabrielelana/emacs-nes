@@ -105,7 +105,7 @@
                :interrupt interrupt
                :dma dma))
     (nes/cpu-set-working-ram cpu ram)
-    (nes/cpu-set-program-rom cpu (lexical-let ((cart cart))
+    (nes/cpu-set-program-rom cpu (let ((cart cart))
                                    (lambda (addr)
                                      (nes/cartridge-read-from-prg-rom cart addr))))
     (nes/cpu-init cpu)
