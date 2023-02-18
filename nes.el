@@ -63,32 +63,23 @@
   (interrupt nil)
   (canvas nil))
 
-;;; This is an hack, for retro we need to have two canvas, the current and the
-;;; previous, this is needed to enable some optimizations, in emacs-nes we don't
-;;; know when a frame has been completely drawn therefore we are don't know when
-;;; to swap current canvas and previous canvas, then we are keeping and empty
-;;; canvas to be always used as previous canvas
-(defconst *EMTPY-CANVAS* nil)
-
 (defun nes-setup (filename)
   (let ((cart (nes/cartridge-load filename))
         (keypad (make-nes/keypad))
         (interrupt (make-nes/interrupt))
         (ram (make-vector #x0800 0))
-        (cpu)
-        (ppu)
-        (dma)
-        (canvas))
+        cpu
+        ppu
+        dma
+        canvas)
     ;; cavas
     (setq canvas (nes/ppu-init nes-buffer-name))
-    (setq *EMTPY-CANVAS* (retro-canvas-copy canvas))
-    (retro--reset-canvas *EMTPY-CANVAS*)
 
     ;; ppu
     (setq ppu (make-nes/ppu
                :interrupt interrupt
                :current-canvas canvas
-               :empty-canvas *EMTPY-CANVAS*))
+               :previous-canvas (retro-canvas-copy canvas)))
     (nes/ppu-set-character-ram ppu (copy-sequence (nes/cartridge->chr-rom cart)))
 
     ;; dma

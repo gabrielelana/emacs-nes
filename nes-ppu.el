@@ -54,7 +54,7 @@
   (scroll-y 0)
   (interrupt nil)
   (current-canvas nil)
-  (empty-canvas nil)
+  (previous-canvas nil)
 
   ;; Background temporary variables
   (name-table-byte 0)
@@ -324,7 +324,7 @@
       visible-cycle-p
       fetch-cycle-p
       current-canvas
-      empty-canvas)
+      previous-canvas)
   (defun nes/ppu-step (ppu)
           (nes/ppu--tick ppu)
 
@@ -340,7 +340,7 @@
                 visible-cycle-p (<= 1 cycle 256)
                 fetch-cycle-p (or pre-fetch-cycle-p visible-cycle-p)
                 current-canvas (nes/ppu->current-canvas ppu)
-                empty-canvas (nes/ppu->empty-canvas ppu))
+                previous-canvas (nes/ppu->previous-canvas ppu))
 
           (when rendering-enabled-p
             ;;
@@ -383,9 +383,9 @@
                 (setf (nes/ppu->sprite-count ppu) 0))))
 
           (when (and (eq scanline 241) (eq cycle 1))
-            (retro--buffer-render current-canvas empty-canvas)
-            (retro--reset-canvas empty-canvas)
-            (cl-rotatef (nes/ppu->current-canvas ppu) (nes/ppu->empty-canvas ppu))
+            (retro--buffer-render current-canvas previous-canvas)
+            (retro--reset-canvas previous-canvas)
+            (cl-rotatef (nes/ppu->current-canvas ppu) (nes/ppu->previous-canvas ppu))
             (nes/ppu--set-vblank ppu))
 
           (when (and pre-render-line-p (eq cycle 1))
