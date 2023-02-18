@@ -397,7 +397,6 @@
           (setf (nes/ppu->line ppu) 0)
           (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1)))))))
 
-
 ;;
 ;; https://wiki.nesdev.com/w/index.php/PPU_scrolling#At_dot_257_of_each_scanline
 ;;

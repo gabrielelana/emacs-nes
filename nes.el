@@ -135,13 +135,10 @@
 (defun nes-quit ()
   (interactive)
   (setq nes--current-game nil)
-  ;; (gamegrid-kill-timer)
   (kill-buffer nes-buffer-name))
 
 (define-derived-mode nes-mode nil "NES Emulator"
   (use-local-map nes-mode-map)
-  ;; (add-hook kill-buffer-hook 'gamegrid-kill-timer nil t)
-  ;; (gamegrid-kill-timer)
   (setq nes--current-game (nes-setup nes--current-cartridge-filename))
   (run-at-time 0.001 nil 'nes-update))
 
