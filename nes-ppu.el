@@ -445,7 +445,7 @@
     (let ((coarse-y (nes/ppu--coarse-y-scroll ppu))
           (y 0))
       (nes/ppu--clear-fine-y-scroll ppu)
-      (case coarse-y
+      (cl-case coarse-y
        (29
         (nes/ppu--toggle-vertical-name-table-select ppu))
        ;; (31
@@ -699,7 +699,7 @@
         (logand (ash (nes/ppu->tile-data2 ppu) (- (* index 4))) #b1111))
     0))
 
-(defun* nes/ppu--get-current-sprite-pixel (ppu)
+(cl-defun nes/ppu--get-current-sprite-pixel (ppu)
   (if (nes/ppu--sprite-enabled-p ppu)
       (let ((offset 0)
             (color 0))
@@ -708,7 +708,7 @@
           (when (<= 0 offset 7)
             (setq color (logand #xF (ash (aref (nes/ppu->sprite-patterns ppu) i) (- (* (- 7 offset) 4)))))
             (when (/= (% color 4) 0)
-              (return-from nes/ppu--get-current-sprite-pixel (vector i color)))))
+              (cl-return-from nes/ppu--get-current-sprite-pixel (vector i color)))))
         [0 0])
     [0 0]))
 
