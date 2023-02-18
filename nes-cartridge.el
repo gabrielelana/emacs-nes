@@ -64,9 +64,9 @@
   (let* ((header
           (nes/cartridge--load-header filepath))
          (trainer-exists
-          (eq (logand (lsh (nes/cartridge-header->flags6 header) -2)) 1))
+          (eq (logand (ash (nes/cartridge-header->flags6 header) -2)) 1))
          (playchoice-exists
-          (eq (logand (lsh (nes/cartridge-header->flags7 header) -1)) 1))
+          (eq (logand (ash (nes/cartridge-header->flags7 header) -1)) 1))
          (body-spec
           `((trainer vec
                      ,(if trainer-exists 512 0)

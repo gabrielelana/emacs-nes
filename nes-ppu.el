@@ -161,7 +161,7 @@
   (nes/ppu--nmi-change ppu)
   ;; t: ...BA.. ........ = d: ......BA
   (setf (nes/ppu->temp ppu) (logior (logand (nes/ppu->temp ppu) #xF3FF)
-                                    (lsh (logand value #x03) 10))))
+                                    (ash (logand value #x03) 10))))
 
 ;;
 ;; https://wiki.nesdev.com/w/index.php/PPU_registers
@@ -222,9 +222,9 @@
         ;; w:                  = 0
         ;;
         (setf (nes/ppu->temp ppu) (logior (logand (nes/ppu->temp ppu) #x8FFF)
-                                          (lsh (logand value #x07) 12)))
+                                          (ash (logand value #x07) 12)))
         (setf (nes/ppu->temp ppu) (logior (logand (nes/ppu->temp ppu) #xFC1F)
-                                          (lsh (logand value #xF8) 2)))
+                                          (ash (logand value #xF8) 2)))
         (setf (nes/ppu->w ppu) nil))
     (progn
       ;;
@@ -233,7 +233,7 @@
       ;; w:                  = 1
       ;;
       (setf (nes/ppu->temp ppu) (logior (logand (nes/ppu->temp ppu) #xFFE0)
-                                        (lsh (logand value #xFF) -3)))
+                                        (ash (logand value #xFF) -3)))
       (setf (nes/ppu->x ppu) (logand value #x07))
       (setf (nes/ppu->w ppu) t))))
 
@@ -261,7 +261,7 @@
       ;; w:                  = 1
       ;;
       (setf (nes/ppu->temp ppu) (logior (logand (nes/ppu->temp ppu) #x80FF)
-                                        (lsh (logand value #x3F) 8)))
+                                        (ash (logand value #x3F) 8)))
       (setf (nes/ppu->w ppu) t))))
 
 ;;
@@ -319,11 +319,7 @@
          (visible-cycle-p (<= 1 cycle 256))
          (fetch-cycle-p (or pre-fetch-cycle-p visible-cycle-p))
          (current-canvas (nes/ppu->current-canvas ppu))
-         (empty-canvas (nes/ppu->empty-canvas ppu))
-         )
-
-    ;; (cl-assert current-canvas)
-    ;; (cl-assert empty-canvas)
+         (empty-canvas (nes/ppu->empty-canvas ppu)))
 
     (when rendering-enabled-p
       ;;
@@ -352,15 +348,13 @@
         (when (eq cycle 256)
           (nes/ppu--increment-y ppu))
         (when (eq cycle 257)
-          ;; (retro--buffer-render current-canvas empty-canvas)
           (nes/ppu--copy-x ppu)))
 
       ;; sprite logic
       (when (eq cycle 257)
         (if visible-line-p
             (nes/ppu--evaluate-sprites ppu)
-          (setf (nes/ppu->sprite-count ppu) 0)))
-      )
+          (setf (nes/ppu->sprite-count ppu) 0))))
 
     (when (and (eq scanline 241) (eq cycle 1))
       (retro--buffer-render current-canvas empty-canvas)
@@ -371,11 +365,9 @@
     (when (and pre-render-line-p (eq cycle 1))
       (nes/ppu--clear-vblank ppu)
       (nes/ppu--clear-sprite-zero-hit ppu)
-      (nes/ppu--clear-sprite-overflow ppu)
-      )
-    ))
+      (nes/ppu--clear-sprite-overflow ppu))))
 
-(defun* nes/ppu--tick (ppu)
+(defun nes/ppu--tick (ppu)
   (when (> (nes/ppu->nmi-delay ppu) 0)
     (cl-decf (nes/ppu->nmi-delay ppu))
     (when (and (zerop (nes/ppu->nmi-delay ppu))
@@ -506,13 +498,13 @@
   (let* ((v (nes/ppu->v ppu))
          (address (logior #x23C0
                           (logand #x0C00 v)
-                          (logand #x0038 (lsh v -4))
-                          (logand #x0007 (lsh v -2))))
-         (shift (logior (logand #x04 (lsh v -4))
+                          (logand #x0038 (ash v -4))
+                          (logand #x0007 (ash v -2))))
+         (shift (logior (logand #x04 (ash v -4))
                         (logand #x02 v)))
          )
     (setf (nes/ppu->attribute-table-byte ppu)
-          (lsh (logand (lsh (nes/ppu--bus-read ppu address) (- shift)) #x03) 2))))
+          (ash (logand (ash (nes/ppu--bus-read ppu address) (- shift)) #x03) 2))))
 
 ;;
 ;; https://wiki.nesdev.com/w/index.php/PPU_scrolling
@@ -551,7 +543,7 @@
       (let* ((bit (- nes/ppu:TILE-WIDTH i 1))
              (p1 (if (nes--logbitp bit hi) #b10 #b00))
              (p2 (if (nes--logbitp bit low) #b01 #b00)))
-        (setq data (logior (lsh data 4)
+        (setq data (logior (ash data 4)
                            (logand #xFF (logior attribute p1 p2))))))
     (setf (nes/ppu->tile-data1 ppu) (logand #xFFFFFFFF data))))
 
@@ -597,7 +589,7 @@
       ))
 
 (defun nes/ppu--fetch-sprite-pattern (ppu row tile attribute sprite-height-8-p)
-  (let ((palette-id (lsh (logand attribute #b11) 2))
+  (let ((palette-id (ash (logand attribute #b11) 2))
         (reversed-horizontally-p (nes--logbitp 6 attribute))
         (base-addr 0)
         (addr 0)
@@ -628,7 +620,7 @@
     (setq hi (nes/ppu--bus-read ppu (+ addr 8)))
     (dotimes (i nes/ppu:TILE-WIDTH)
       (let ((idx (if reversed-horizontally-p i (- nes/ppu:TILE-WIDTH 1 i))))
-        (setq patterns (logior (lsh patterns 4)
+        (setq patterns (logior (ash patterns 4)
                                palette-id
                                (if (nes--logbitp idx low) #b01 #b00)
                                (if (nes--logbitp idx hi) #b10 #b00)))))
@@ -695,7 +687,7 @@
 (defun nes/ppu--get-current-background-palette-index (ppu)
   (if (nes/ppu--background-enabled-p ppu)
       (let ((index (- nes/ppu:TILE-WIDTH 1 (nes/ppu->x ppu))))
-        (logand (lsh (nes/ppu->tile-data2 ppu) (- (* index 4))) #b1111))
+        (logand (ash (nes/ppu->tile-data2 ppu) (- (* index 4))) #b1111))
     0))
 
 (defun* nes/ppu--get-current-sprite-pixel (ppu)
@@ -705,7 +697,7 @@
         (dotimes (i (nes/ppu->sprite-count ppu))
           (setq offset (- (nes/ppu--current-x ppu) (aref (nes/ppu->sprite-positions ppu) i)))
           (when (<= 0 offset 7)
-            (setq color (logand #xF (lsh (aref (nes/ppu->sprite-patterns ppu) i) (- (* (- 7 offset) 4)))))
+            (setq color (logand #xF (ash (aref (nes/ppu->sprite-patterns ppu) i) (- (* (- 7 offset) 4)))))
             (when (/= (% color 4) 0)
               (return-from nes/ppu--get-current-sprite-pixel (vector i color)))))
         [0 0])
@@ -779,14 +771,14 @@
   (setf (nes/ppu->v ppu) (logand (nes/ppu->v ppu) #b1111111111100000)))
 
 (defsubst nes/ppu--coarse-y-scroll (ppu)
-  (lsh (logand (nes/ppu->v ppu) #b0000001111100000) -5))
+  (ash (logand (nes/ppu->v ppu) #b0000001111100000) -5))
 
 (defsubst nes/ppu--set-coarse-y-scroll (ppu y)
   (setf (nes/ppu->v ppu) (logior (logand (nes/ppu->v ppu) #b01111110000011111)
-                                 (lsh y 5))))
+                                 (ash y 5))))
 
 (defsubst nes/ppu--fine-y-scroll (ppu)
-  (lsh (logand (nes/ppu->v ppu) #b0111000000000000) -12))
+  (ash (logand (nes/ppu->v ppu) #b0111000000000000) -12))
 
 (defsubst nes/ppu--clear-fine-y-scroll (ppu)
   (setf (nes/ppu->v ppu) (logand (nes/ppu->v ppu) #b1000111111111111)))

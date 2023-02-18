@@ -18,7 +18,7 @@
 
 (defun nes/dma-request-transfer (dma address)
   (setf (nes/dma->processing dma) t)
-  (setf (nes/dma->ram-addr dma) (lsh address 8)))
+  (setf (nes/dma->ram-addr dma) (ash address 8)))
 
 (defun nes/dma-transfer (dma)
   (when (nes/dma-processing-p dma)
