@@ -773,7 +773,7 @@
 (defun nes/ppu--left-sprite-enabled-p (ppu)
   (nes--logbitp 2 (nes/ppu->ppumask ppu)))
 
-(defun nes/ppu--background-enabled-p (ppu)
+(defsubst nes/ppu--background-enabled-p (ppu)
   (nes--logbitp 3 (nes/ppu->ppumask ppu)))
 
 (defun nes/ppu--sprite-enabled-p (ppu)
