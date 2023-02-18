@@ -88,8 +88,7 @@
     (setq ppu (make-nes/ppu
                :interrupt interrupt
                :current-canvas canvas
-               :empty-canvas *EMTPY-CANVAS*
-               ))
+               :empty-canvas *EMTPY-CANVAS*))
     (nes/ppu-set-character-ram ppu (copy-sequence (nes/cartridge->chr-rom cart)))
 
     ;; dma
