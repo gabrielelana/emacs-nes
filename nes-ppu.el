@@ -801,33 +801,13 @@
 (defsubst nes/ppu--toggle-vertical-name-table-select (ppu)
   (setf (nes/ppu->v ppu) (logxor (nes/ppu->v ppu) #b0000100000000000)))
 
-;; (defun nes/ppu--display-options ()
-;;   (let ((options (make-vector 256 '(nil nil nil))))
-;;     (dotimes (i (length nes/colors))
-;;       (aset options (+ i nes/ppu:COLOR-START-OFFSET) (aref nes/colors i)))
-;;     options))
-
 (defun nes/ppu--init-retro-colors ()
   "Initialize retro palette with nes colors."
-  ;; (retro--init-color-palette nes/color:COLORS nes/ppu:COLOR-START-OFFSET)
-  (retro--init-color-palette nes/color:COLORS 0)
-  )
+  (retro--init-color-palette nes/color:COLORS 0))
 
-;; ;;; TODO: plot single pixel (x,y) with color (c)
-;; ;;; TODO: what kind of color is c
-;; (defun nes/ppu--render-set-cell (x y c p w)
-;;   (retro--plot-pixel x y c p w)
-;;   ;; (save-excursion
-;;   ;;   (let ((buffer-read-only nil))
-;;   ;;     (goto-char (1+ (gamegrid-cell-offset x y)))
-;;   ;;     (gamegrid-set-face (+ c nes/ppu:COLOR-START-OFFSET))))
-;;   )
-
-;; TODO: initialize retro buffer
 (defun nes/ppu-init (buffer-name)
   (select-window (or (get-buffer-window buffer-name)
                      (selected-window)))
-  ;; TODO: initialize retro
   (nes/ppu--init-retro-colors)
   (switch-to-buffer buffer-name)
   (let* ((window (selected-window))
