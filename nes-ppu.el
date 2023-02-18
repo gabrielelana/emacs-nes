@@ -318,6 +318,7 @@
       visible-line-p
       render-line-p
       cycle
+      cycle-8
       pre-fetch-cycle-p
       visible-cycle-p
       fetch-cycle-p
@@ -333,6 +334,7 @@
                 visible-line-p (< scanline 240)
                 render-line-p (or pre-render-line-p visible-line-p)
                 cycle (nes/ppu->cycle ppu)
+                cycle-8 (% cycle 8)
                 pre-fetch-cycle-p (<= 321 cycle 336)
                 visible-cycle-p (<= 1 cycle 256)
                 fetch-cycle-p (or pre-fetch-cycle-p visible-cycle-p)
