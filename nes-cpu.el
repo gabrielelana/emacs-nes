@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (require 'nes-dma)
 (require 'nes-instruction)
@@ -10,7 +10,7 @@
 (require 'nes-util)
 
 ;; https://wiki.nesdev.com/w/index.php/CPU_registers
-(defstruct (nes/cpu-register
+(cl-defstruct (nes/cpu-register
             (:conc-name nes/cpu-register->))
   (acc 0)
   (idx-x 0)
@@ -28,13 +28,13 @@
   (sr-overflow nil)
   (sr-negative nil))
 
-(defstruct (nes/cpu-bus
+(cl-defstruct (nes/cpu-bus
             (:conc-name nes/cpu-bus->))
   (ram nil)
   (prg-rom (lambda (ignored)))
   )
 
-(defstruct (nes/cpu
+(cl-defstruct (nes/cpu
             (:conc-name nes/cpu->))
   (cycles 0)
   (ppu nil)
@@ -154,7 +154,7 @@
 
 (defun nes/cpu--get-instruction-operand-and-cycle (c mode)
   (let ((register (nes/cpu->register c)))
-    (case mode
+    (cl-case mode
       (:accumulator
        '(nil . 0))
 
@@ -233,7 +233,7 @@
 (defun nes/cpu--fetch (c &optional size)
   (let ((size (or size :byte))
         (addr (nes/cpu-register->pc (nes/cpu->register c))))
-    (incf (nes/cpu-register->pc (nes/cpu->register c)) (if (eq size :word) 2 1))
+    (cl-incf (nes/cpu-register->pc (nes/cpu->register c)) (if (eq size :word) 2 1))
     (nes/cpu-read c addr size)))
 
 (defun nes/cpu-set-working-ram (cpu ram)

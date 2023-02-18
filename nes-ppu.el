@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 ;; (require 'gamegrid)
 (require 'nes-util)
@@ -131,7 +131,7 @@
    ))
 
 (defun nes/ppu-read (p addr)
-  (case addr
+  (cl-case addr
     (#x2002 (nes/ppu--read-status p))
     (#x2004 (nes/ppu--read-oam-data p))
     (#x2007 (nes/ppu--read-data p))
@@ -140,7 +140,7 @@
 
 (defun nes/ppu-write (p addr value)
   (setq value (logand #xFF value))
-  (case addr
+  (cl-case addr
     (#x2000 (nes/ppu--write-control p value))
     (#x2001 (nes/ppu--write-mask p value))
     (#x2003 (nes/ppu--write-oam-address p value))

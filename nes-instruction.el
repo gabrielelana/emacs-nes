@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (defconst nes/instruction:CYCLES
   [7 6 2 8 3 3 5 5 3 2 2 2 4 4 6 6   ;; 0x00
@@ -24,8 +24,8 @@
 
 (defconst nes/instruction:MAP (make-vector 256 nil))
 
-(defstruct (nes/instruction
-            (:conc-name nes/instruction->))
+(cl-defstruct (nes/instruction
+               (:conc-name nes/instruction->))
   name
   func
   mode
@@ -290,9 +290,6 @@
 (aset nes/instruction:MAP #x7B (make-nes/instruction :func #'nes/instruction-rra :name "RRA" :mode :absolute-y))
 (aset nes/instruction:MAP #x63 (make-nes/instruction :func #'nes/instruction-rra :name "RRA" :mode :pre-indexed-indirect))
 (aset nes/instruction:MAP #x73 (make-nes/instruction :func #'nes/instruction-rra :name "RRA" :mode :post-indexed-indirect))
-
-
-(provide 'nes-instruction)
 
 ;; Responding to recursive calls from nes-cpu
 (require 'nes-cpu)
@@ -861,3 +858,7 @@
           (= (logand operated #xFF) 0))
     (setf (nes/cpu-register->acc reg) (logand operated #xFF))
     (nes/cpu-write c addr data)))
+
+(provide 'nes-instruction)
+
+;;; nes-instruction.el ends here

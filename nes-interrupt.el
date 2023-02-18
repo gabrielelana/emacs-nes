@@ -1,8 +1,8 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
-(defstruct (nes/interrupt
+(cl-defstruct (nes/interrupt
             (:conc-name nes/interrupt->))
   (irq nil)
   (nmi nil))

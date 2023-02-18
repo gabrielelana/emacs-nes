@@ -1,12 +1,12 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (require 'nes-ppu)
 
 (defconst nes/dma:TRANSFER-BYTESIZE #x0100)
 
-(defstruct (nes/dma
+(cl-defstruct (nes/dma
             (:conc-name nes/dma->))
   (ppu nil)
   (ram nil)

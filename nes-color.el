@@ -1,7 +1,6 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
-(require 'cl-lib)
+(eval-when-compile (require 'cl-lib))
 
 (defconst nes/color:COLORS
   [
@@ -72,7 +71,7 @@
    ])
 
 (defconst nes/colors
-  (map 'vector
+  (cl-map 'vector
        (lambda (color)
          (let ((normalize0 (/ (nth 0 color) 255.0))
                (normalize1 (/ (nth 1 color) 255.0))

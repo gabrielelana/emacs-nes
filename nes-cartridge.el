@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (require 'bindat)
 
@@ -18,7 +18,7 @@
 ;;
 ;; see https://wiki.nesdev.com/w/index.php/INES#iNES_file_format
 ;;
-(defstruct (nes/cartridge
+(cl-defstruct (nes/cartridge
             (:conc-name nes/cartridge->))
   header
   trainer
@@ -28,7 +28,7 @@
   pc-prom-data
   pc-prom-counter-out-data)
 
-(defstruct (nes/cartridge-header
+(cl-defstruct (nes/cartridge-header
             (:conc-name nes/cartridge-header->))
   constant
   size-of-prg-rom
