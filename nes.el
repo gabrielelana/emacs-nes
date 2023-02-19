@@ -63,7 +63,7 @@
   (interrupt nil)
   (canvas nil))
 
-(defun nes-setup (filename)
+(defun nes-setup (filename switch-to-buffer-p)
   (let ((cart (nes/cartridge-load filename))
         (keypad (make-nes/keypad))
         (interrupt (make-nes/interrupt))
@@ -73,7 +73,7 @@
         dma
         canvas)
     ;; cavas
-    (setq canvas (nes/ppu-init nes-buffer-name))
+    (setq canvas (nes/ppu-init nes-buffer-name switch-to-buffer-p))
 
     ;; ppu
     (setq ppu (make-nes/ppu
@@ -129,7 +129,7 @@
 
 (define-derived-mode nes-mode nil "NES Emulator"
   (use-local-map nes-mode-map)
-  (setq nes--current-game (nes-setup nes--current-cartridge-filename))
+  (setq nes--current-game (nes-setup nes--current-cartridge-filename t))
   (run-at-time 0.001 nil 'nes-update))
 
 (defun nes (filename)

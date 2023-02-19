@@ -820,49 +820,60 @@
   "Initialize retro palette with nes colors."
   (retro--init-color-palette nes/color:COLORS 0))
 
-(defun nes/ppu-init (buffer-name)
+(defun nes/ppu-init (buffer-name switch-to-buffer-p)
+  (nes/ppu--init-retro-colors)
   (select-window (or (get-buffer-window buffer-name)
                      (selected-window)))
-  (nes/ppu--init-retro-colors)
-  (switch-to-buffer buffer-name)
-  (let* ((window (selected-window))
-         (calibration (retro--calibrate-canvas-in-window
-                       nes/ppu:SCREEN-WIDTH
-                       nes/ppu:SCREEN-HEIGHT
-                       window))
-         (pixel-size (nth 0 calibration))
-         (window-width (nth 1 calibration))
-         (window-height (nth 2 calibration))
-         (background-color 13))
-    (face-remap-add-relative 'default :family retro-square-font-family :height pixel-size)
-    (let* ((margin-top (/ (- window-height nes/ppu:SCREEN-HEIGHT) 2))
-           (margin-left (/ (- window-width nes/ppu:SCREEN-WIDTH) 2))
-           (canvas (retro-canvas-create :margin-left margin-left
-                                        :margin-top margin-top
-                                        :width nes/ppu:SCREEN-WIDTH
-                                        :height nes/ppu:SCREEN-HEIGHT
-                                        :background-color background-color))
-           (margin-top-string (propertize (make-string (+ margin-left nes/ppu:SCREEN-WIDTH) 32) 'face 'default))
-           (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
-           (canvas-string (propertize (make-string nes/ppu:SCREEN-WIDTH 32) 'face (aref retro-palette-faces background-color))))
-      (dotimes (_ margin-top)
-        (insert margin-top-string)
-        (insert "\n"))
-      (dotimes (_ nes/ppu:SCREEN-HEIGHT)
-        (insert margin-left-string)
-        (insert canvas-string)
-        (insert "\n"))
-      (setq-local buffer-read-only t
-                  visible-cursor nil
-                  cursor-type nil
-                  inhibit-modification-hooks t
-                  inhibit-compacting-font-caches t
-                  bidi-inhibit-bpa t
-                  bidi-display-reordering nil
-                  bidi-paragraph-direction 'left-to-right
-                  buffer-read-only nil
-                  mode-line-format nil)
-      canvas)))
+  (with-current-buffer (get-buffer-create buffer-name)
+    (let* ((window (selected-window))
+           ;; NOTE: without switching to buffer, buffer calibration is not
+           ;; reliable, I didn't find a way to make it work but since we don't
+           ;; need precision because we are not looking at the buffer, a dummy
+           ;; but credible calibration will do
+           (calibration (if switch-to-buffer-p
+                            (retro--calibrate-canvas-in-window
+                             nes/ppu:SCREEN-WIDTH
+                             nes/ppu:SCREEN-HEIGHT
+                             window)
+                          (list 10 nes/ppu:SCREEN-WIDTH nes/ppu:SCREEN-HEIGHT)))
+           (pixel-size (nth 0 calibration))
+           (window-width (nth 1 calibration))
+           (window-height (nth 2 calibration))
+           ;; TODO: fetch background color based on color hex not number
+           (background-color 13))
+      (when (not calibration) (error "Failed to calibrate pixel size in buffer %s" buffer-name))
+      (set-face-attribute 'retro-default-face nil :height pixel-size)
+      (buffer-face-set 'retro-default-face)
+      (let* ((margin-top (/ (- window-height nes/ppu:SCREEN-HEIGHT) 2))
+             (margin-left (/ (- window-width nes/ppu:SCREEN-WIDTH) 2))
+             (canvas (retro-canvas-create :margin-left margin-left
+                                          :margin-top margin-top
+                                          :width nes/ppu:SCREEN-WIDTH
+                                          :height nes/ppu:SCREEN-HEIGHT
+                                          :background-color background-color))
+             (margin-top-string (propertize (make-string (+ margin-left nes/ppu:SCREEN-WIDTH) 32) 'face 'default))
+             (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
+             (canvas-string (propertize (make-string nes/ppu:SCREEN-WIDTH 32) 'face (aref retro-palette-faces background-color))))
+        (dotimes (_ margin-top)
+          (insert margin-top-string)
+          (insert "\n"))
+        (dotimes (_ nes/ppu:SCREEN-HEIGHT)
+          (insert margin-left-string)
+          (insert canvas-string)
+          (insert "\n"))
+        (setq-local buffer-read-only t
+                    visible-cursor nil
+                    cursor-type nil
+                    inhibit-modification-hooks t
+                    inhibit-compacting-font-caches t
+                    bidi-inhibit-bpa t
+                    bidi-display-reordering nil
+                    bidi-paragraph-direction 'left-to-right
+                    buffer-read-only nil
+                    mode-line-format nil)
+        (when switch-to-buffer-p
+          (switch-to-buffer buffer-name))
+        canvas))))
 
 (defun nes/ppu-set-character-ram (ppu ram)
   (setf (nes/ppu-bus->character-ram (nes/ppu->bus ppu)) ram))
