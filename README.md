@@ -34,10 +34,7 @@ tests) follow this steps:
 
 - Install [retro.el](https://github.com/gabrielelana/retro.el)
 - Install the code in this repository, see [Install](#install)
-- Execute the following function
-  ```cl
-  (nes "path/to/rom.nes")
-  ```
+- Execute `nes` command then select on your file system the NES ROM you want to run
 
 ## History
 
