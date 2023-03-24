@@ -49,6 +49,11 @@
 (defvar nes--current-cartridge-filename nil)
 (defvar nes--current-game nil)
 
+(defvar nes-mode-map
+  (let ((map (make-sparse-keymap)))
+    map)
+  "Keymap for `nes-mode'.")
+
 (setq nes-mode-map
       (let ((map (make-sparse-keymap 'nes-mode-map)))
         (define-key map (kbd "q") #'nes-quit)
