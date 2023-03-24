@@ -710,14 +710,14 @@
   (let* ((register (nes/cpu->register c))
          (interrupt (nes/cpu-register->sr-interrupt register)))
     (setf (nes/cpu-register->sr-break register) t)
-    (incf (nes/cpu-register->pc register))
+    (cl-incf (nes/cpu-register->pc register))
     (nes/cpu-push c (logand #xFF (ash (nes/cpu-register->pc register) -8)))
     (nes/cpu-push c (logand #xFF (nes/cpu-register->pc register)))
     (nes/cpu-push-status-register c)
     (unless interrupt
       (setf (nes/cpu-register->sr-interrupt register) t)
       (setf (nes/cpu-register->pc register) (nes/cpu-read c #xFFFE :word)))
-    (decf (nes/cpu-register->pc register))))
+    (cl-decf (nes/cpu-register->pc register))))
 
 (defun nes/instruction-jsr (c address _mode)
   (let* ((register (nes/cpu->register c))
