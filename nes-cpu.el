@@ -11,7 +11,7 @@
 
 ;; https://wiki.nesdev.com/w/index.php/CPU_registers
 (cl-defstruct (nes/cpu-register
-            (:conc-name nes/cpu-register->))
+               (:conc-name nes/cpu-register->))
   (acc 0)
   (idx-x 0)
   (idx-y 0)
@@ -95,6 +95,18 @@
     (setf (nes/cpu-register->sp register) addr)
     (nes/cpu-read c (logior #x100 (logand addr #x0ff)))))
 
+(defun nes/cpu-status-register (c)
+  (let ((r (nes/cpu->register c)))
+    (logior (ash (if (nes/cpu-register->sr-negative r)  1 0) 7)
+            (ash (if (nes/cpu-register->sr-overflow r)  1 0) 6)
+            (ash (if (nes/cpu-register->sr-reserved r)  1 0) 5)
+            (ash (if (nes/cpu-register->sr-break r)     1 0) 4)
+            (ash (if (nes/cpu-register->sr-decimal r)   1 0) 3)
+            (ash (if (nes/cpu-register->sr-interrupt r) 1 0) 2)
+            (ash (if (nes/cpu-register->sr-zero r)      1 0) 1)
+            (ash (if (nes/cpu-register->sr-carry r)     1 0) 0))))
+
+;;; TODO: use nes/cpu-status-register above
 (defun nes/cpu-push-status-register (c)
   (let ((r (nes/cpu->register c)))
     (nes/cpu-push c
@@ -229,6 +241,11 @@
                                8))
                        #xFFFF)
                0))))))
+
+(defun nes/cpu--peek (c &optional size)
+  (let ((size (or size :byte))
+        (addr (nes/cpu-register->pc (nes/cpu->register c))))
+    (nes/cpu-read c addr size)))
 
 (defun nes/cpu--fetch (c &optional size)
   (let ((size (or size :byte))

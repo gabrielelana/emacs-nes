@@ -24,20 +24,87 @@
 
 ;;; Code:
 
+;;; TODO: why do we need it?
+(require 'cl-lib)
+(require 'f)
 (require 'nes)
+;; https://github.com/qpalzmqaz123/tsnes/blob/master/src/cpu/__tests__/nestest/instr.test.ts
 
 (ert-deftest nestest-shall-pass ()
+  ;; TODO: path to rom relative
   (let ((emulator (nes-setup "/home/coder/code/emacs-nes/test/roms/nestest.nes" nil)))
-    (should emulator))
+    ;; we are able to load a cartridge
+    (should emulator)
 
-    ;; this.emulator.cpu.reset();
-    ;; this.emulator.cpu.registers.PC = 0xC000;
-    ;; this.emulator.cpu.deferCycles = 7;
-    ;; this.emulator.cpu.setFlag(Flags.I, true);
-    ;; this.emulator.cpu.setFlag(Flags.U, true);
-    ;; this.emulator.ppu.scanLine = 0;
-    ;; this.emulator.ppu.cycle = -21;
-  )
+    (let* ((c (nes-cpu emulator))
+           (p (nes-ppu emulator))
+           (r (nes/cpu->register c))
+           (cyc 7)
+           (log (f-read-text "/home/coder/code/emacs-nes/test/nestest.log"))
+           (line-counter 0)
+           )
+      ;; this.emulator.cpu.reset();
+      ;; this.emulator.cpu.registers.PC = 0xC000;
+      (setf (nes/cpu-register->pc r) #xc000)
+      ;; this.emulator.cpu.setFlag(Flags.I, true);
+      (setf (nes/cpu-register->sr-interrupt r) t)
+      ;; this.emulator.cpu.setFlag(Flags.U, true);
+      (setf (nes/cpu-register->sr-reserved r) t)
+      (setf (nes/cpu-register->sr-break r) nil)
+
+      ;; NOTE: we don't have it, it delays the cpu execution to synchronize it with the ppu
+      ;; this.emulator.cpu.deferCycles = 7;
+      ;; this.emulator.ppu.cycle = -21;
+
+      ;; this.emulator.ppu.scanLine = 0;
+      (setf (nes/ppu->line p) 0)
+
+      (dolist (line (split-string log "\n" t))
+        (cl-incf line-counter)
+        (let* ((line-header (format "%05d: " line-counter))
+               (expected (concat line-header (substring line 0 4) " " (substring line 48)))
+               (given (concat line-header (nes/snapshot c p r cyc))))
+          (should (equal expected given))
+          (let ((step-cyc (nes/cpu-step c)))
+            (cl-incf cyc step-cyc)
+            (dotimes (_ (* step-cyc 3))
+              (nes/ppu-step p)))))
+      (should (equal #x00 (nes/cpu-read c #x02)))
+      (should (equal #x00 (nes/cpu-read c #x03))))))
+
+
+(defun nes/snapshot (cpu ppu reg cyc)
+  "Return a string/line representing the current hw state.
+
+CPU is the CPU
+PPU is the PPU
+REG are the CPU registers
+CYC global CPU clock counter."
+  ;; const PC = this.emulator.cpu.registers.PC;
+  ;; const A = this.emulator.cpu.registers.A;
+  ;; const X = this.emulator.cpu.registers.X;
+  ;; const Y = this.emulator.cpu.registers.Y;
+  ;; const P = this.emulator.cpu.registers.P;
+  ;; const SP = this.emulator.cpu.registers.SP;
+  ;; const CYC = this.emulator.cpu.clocks;
+  ;; const PPU = [this.emulator.ppu.cycle, this.emulator.ppu.scanLine];
+  (let* ((pc (nes/cpu-register->pc reg))
+         (a (nes/cpu-register->acc reg))
+         (x (nes/cpu-register->idx-x reg))
+         (y (nes/cpu-register->idx-y reg))
+         (p (nes/cpu-status-register cpu))
+         (sp (nes/cpu-register->sp reg))
+         ;; TODO: use internal cycles to track global clock counter
+         ;; (cyc (nes/cpu->cycles cpu))         ; ???
+         (pcyc (nes/ppu->cycle ppu))
+         (psl (nes/ppu->line ppu))
+         ;; TODO: (nes/cpu-current-op c)
+         (op (nes/cpu--peek cpu))
+         )
+    ;; const log = sprintf('%04X A:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d',
+    ;;                           PC, A, X, Y, P, SP, PPU[0], PPU[1], CYC);
+    (format "%X A:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d" pc a x y p sp pcyc psl cyc)))
+
 
 (provide 'example-test)
 
