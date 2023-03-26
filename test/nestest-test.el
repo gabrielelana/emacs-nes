@@ -99,11 +99,11 @@ CYC global CPU clock counter."
          (pcyc (nes/ppu->cycle ppu))
          (psl (nes/ppu->line ppu))
          ;; TODO: (nes/cpu-current-op c)
-         (op (nes/cpu--peek cpu))
+         ;; (op (nes/cpu--peek cpu))
          )
     ;; const log = sprintf('%04X A:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d',
     ;;                           PC, A, X, Y, P, SP, PPU[0], PPU[1], CYC);
-    (format "%X A:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d" pc a x y p sp pcyc psl cyc)))
+    (format "%04X A:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d" pc a x y p sp pcyc psl cyc)))
 
 
 (provide 'example-test)
