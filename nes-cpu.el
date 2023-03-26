@@ -216,15 +216,19 @@
                          0 1)))
          (cons (logand (+ addr idx-y) #xFFFF) cycle)))
 
+      ;; X-Indexed Zero Page Indirect
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8,X)
       (:pre-indexed-indirect
        (let* ((base-addr (logand (+ (nes/cpu--fetch c) (nes/cpu-register->idx-x register))
                                  #xFF))
               (addr (logand (+ (nes/cpu-read c base-addr)
                                (ash (nes/cpu-read c (logand (1+ base-addr) #xFF)) 8))
                             #xFFFF))
-              (cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0)))
-         (cons addr cycle)))
+              ;; (cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0))
+              )
+         (cons addr 0)))
 
+      ;; Zero Page Indirect Y-Indexed
       (:post-indexed-indirect
        (let* ((data-addr (nes/cpu--fetch c))
               (base-addr (+ (nes/cpu-read c data-addr)
