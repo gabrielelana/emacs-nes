@@ -269,9 +269,17 @@
          (operand (car operand-and-cycle))
          (inst-cycle (aref nes/instruction:CYCLES opcode))
          (add-cycle (cdr operand-and-cycle)))
+    ;; TODO: make nes/cpu->cycles accumulate all the cycles with as 16 bit counter
     (setf (nes/cpu->cycles c) 0)
     (funcall (nes/instruction->func inst) c operand (nes/instruction->mode inst))
-    (+ (nes/cpu->cycles c) inst-cycle add-cycle)))
+    (+ (nes/cpu->cycles c)
+       inst-cycle
+       ;; NOTE: we are going to pay the extra cycle for crossing memory page
+       ;; only if the op did something aka changed the cycle aka ex. jumped
+       ;; TODO: make nes/instruction-* take cycles parameter
+       ;; TODO: make nes/instruction-* take penalty-cycle parameter
+       ;; TODO: make nes/instruction-* function return taken-cycles
+       (if (eq (nes/cpu->cycles c) 0) 0 add-cycle))))
 
 (defun nes/cpu-init (c)
   (nes/cpu-reset c))
