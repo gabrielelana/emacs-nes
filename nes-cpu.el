@@ -285,6 +285,7 @@
        ;; TODO: make nes/instruction-* function return taken-cycles
        (if (or
             (equal "LDA" (nes/instruction->name inst))
+            (equal "LDX" (nes/instruction->name inst))
             (equal "LDY" (nes/instruction->name inst))
             (equal "NOPI" (nes/instruction->name inst))
             (> (nes/cpu->cycles c) 0))
