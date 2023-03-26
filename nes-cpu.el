@@ -283,7 +283,11 @@
        ;; TODO: make nes/instruction-* take cycles parameter
        ;; TODO: make nes/instruction-* take penalty-cycle parameter
        ;; TODO: make nes/instruction-* function return taken-cycles
-       (if (eq (nes/cpu->cycles c) 0) 0 add-cycle))))
+       (if (or
+            (equal "LDA" (nes/instruction->name inst))
+            (> (nes/cpu->cycles c) 0))
+           add-cycle
+         0))))
 
 (defun nes/cpu-init (c)
   (nes/cpu-reset c))
