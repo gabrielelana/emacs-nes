@@ -98,7 +98,14 @@
      :header header
      :trainer (bindat-get-field body-decoded 'trainer)
      :prg-rom (bindat-get-field body-decoded 'prg-rom)
-     :chr-rom (bindat-get-field body-decoded 'chr-rom)
+     :chr-rom (if (eq 0 (nes/cartridge-header->size-of-chr-rom header))
+                  ;; board is using chr-ram instead of chr-rom
+                  ;;
+                  ;; ???: in some emulators in this case it's a reference of
+                  ;; (nes/ppu-bus->video-ram) need to clarify, for now it's
+                  ;; working
+                  (make-vector 16384 0)
+                (bindat-get-field body-decoded 'chr-rom))
      :pc-inst-rom (bindat-get-field body-decoded 'pc-inst-rom)
      :pc-prom-data (bindat-get-field body-decoded 'pc-prom-data)
      :pc-prom-counter-out-data (bindat-get-field body-decoded 'pc-prom-counter-out-data))))
