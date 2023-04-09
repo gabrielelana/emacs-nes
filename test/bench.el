@@ -36,9 +36,9 @@
   (/ 1.0 (/ NES/CPU-CLOCK 3.5 1000000.0))
   "On real CPU: microseconds per OP (assuming ~3.5 clock per OP).")
 
-;;; TODO: save somewhere results based on the name of the rom
+;;; TODO: save somewhere the best result based on the name of the rom
 (defconst NES/EMULATOR-US-PER-OP
-  7.22
+  6.83
   "Emulator: microseconds per OP (best recorded so far).")
 
 (defmacro bench-rom (repeat steps rom-path &optional setup)
