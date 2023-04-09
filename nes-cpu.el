@@ -111,22 +111,14 @@ SIZE can be :byte or :word"
             (ash (if (nes/cpu-register->sr-zero r)      1 0) 1)
             (ash (if (nes/cpu-register->sr-carry r)     1 0) 0))))
 
-;;; TODO: use nes/cpu-status-register above
-(defun nes/cpu-push-status-register (c)
-  (let ((r (nes/cpu->register c)))
-    (nes/cpu-push c
-                  (logior (ash (if (nes/cpu-register->sr-negative r)  1 0) 7)
-                          (ash (if (nes/cpu-register->sr-overflow r)  1 0) 6)
-                          (ash (if (nes/cpu-register->sr-reserved r)  1 0) 5)
-                          (ash (if (nes/cpu-register->sr-break r)     1 0) 4)
-                          (ash (if (nes/cpu-register->sr-decimal r)   1 0) 3)
-                          (ash (if (nes/cpu-register->sr-interrupt r) 1 0) 2)
-                          (ash (if (nes/cpu-register->sr-zero r)      1 0) 1)
-                          (ash (if (nes/cpu-register->sr-carry r)     1 0) 0)))))
+(defun nes/cpu-push-status-register (cpu)
+  "Push status register to stack of CPU."
+  (nes/cpu-push cpu (nes/cpu-status-register cpu)))
 
-(defun nes/cpu-pull-status-register (c)
-  (let ((data (nes/cpu-pull c))
-        (r (nes/cpu->register c)))
+(defun nes/cpu-pull-status-register (cpu)
+  "Pull byte from stack and use it to set status register of CPU."
+  (let ((data (nes/cpu-pull cpu))
+        (r (nes/cpu->register cpu)))
     (setf (nes/cpu-register->sr-negative r)  (nes--logbitp 7 data))
     (setf (nes/cpu-register->sr-overflow r)  (nes--logbitp 6 data))
     (setf (nes/cpu-register->sr-reserved r)  (nes--logbitp 5 data))
