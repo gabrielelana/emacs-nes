@@ -31,8 +31,7 @@
 (cl-defstruct (nes/cpu-bus
             (:conc-name nes/cpu-bus->))
   (ram nil)
-  (prg-rom (lambda (ignored)))
-  )
+  (prg-rom (lambda (ignored))))
 
 (cl-defstruct (nes/cpu
             (:conc-name nes/cpu->))
@@ -42,61 +41,67 @@
   (keypad nil)
   (bus (make-nes/cpu-bus))
   (register (make-nes/cpu-register))
-  (interrupt nil)
-  )
+  (interrupt nil))
 
-(defun nes/cpu--bus-read (c addr)
-  (let ((b (nes/cpu->bus c))
-        (ppu (nes/cpu->ppu c)))
+(defun nes/cpu--bus-read (cpu addr)
+  "Read byte at ADDR of CPU bus."
+  (let ((b (nes/cpu->bus cpu))
+        (ppu (nes/cpu->ppu cpu)))
     (cond
      ((< addr #x0800) (aref (nes/cpu-bus->ram b) addr))
-     ((< addr #x2000) (nes/cpu--bus-read c (- addr #x0800)))
+     ((< addr #x2000) (nes/cpu--bus-read cpu (- addr #x0800)))
      ((< addr #x4000) (nes/ppu-read ppu (+ (mod addr #x0008) #x2000)))
-     ((eq addr #x4016) (nes/keypad-read (nes/cpu->keypad c)))
+     ((eq addr #x4016) (nes/keypad-read (nes/cpu->keypad cpu))) ; 1P
      ;; ((eq addr #x4017) (nes/keypad-read (nes/cpu->keypad c))) ;; 2P
      ((>= addr #x8000) (funcall (nes/cpu-bus->prg-rom b) addr))
-     (t 0)
-     )))
+     (t 0))))
 
-(defun nes/cpu--bus-write (c addr data)
-  (let ((b (nes/cpu->bus c))
-        (ppu (nes/cpu->ppu c)))
+(defun nes/cpu--bus-write (cpu addr data)
+  "Write byte DATA to ADDR of CPU bus."
+  (let ((b (nes/cpu->bus cpu))
+        (ppu (nes/cpu->ppu cpu)))
     (cond
      ((< addr #x2000) (aset (nes/cpu-bus->ram b) (% addr #x0800) data))
      ((< addr #x4000) (nes/ppu-write ppu (+ (% addr #x0008) #x2000) data))
      ;; ((< addr #x4014) ( ... )) ;; APU
-     ((eq addr #x4014) (nes/dma-request-transfer (nes/cpu->dma c) data))
-     ((eq addr #x4016) (nes/keypad-write (nes/cpu->keypad c) data))
+     ((eq addr #x4014) (nes/dma-request-transfer (nes/cpu->dma cpu) data))
+     ((eq addr #x4016) (nes/keypad-write (nes/cpu->keypad cpu) data))
      ;; ((eq addr #x4017) (nes/keypad-write (nes/cpu->keypad c) data))  ;; 2P
      )))
 
-(defun nes/cpu-read (c addr &optional size)
+(defun nes/cpu-read (cpu addr &optional size)
+  "Read SIZE data at ADDR of CPU bus.
+
+SIZE can be :byte or :word"
   (setq size (or size :byte))
   (setq addr (logand addr #xffff))
   (if (eq size :word)
       (logior
-       (logand (nes/cpu--bus-read c addr) #xFF)
-       (logand (ash (nes/cpu--bus-read c (1+ addr)) 8) #xFF00)
-       )
-    (logand (nes/cpu--bus-read c addr) #xFF)))
+       (logand (nes/cpu--bus-read cpu addr) #xFF)
+       (logand (ash (nes/cpu--bus-read cpu (1+ addr)) 8) #xFF00))
+    (logand (nes/cpu--bus-read cpu addr) #xFF)))
 
-(defun nes/cpu-write (c addr data)
-  (nes/cpu--bus-write c addr data))
+(defun nes/cpu-write (cpu addr data)
+  "Write DATA to ADDR of CPU bus."
+  (nes/cpu--bus-write cpu addr data))
 
-(defun nes/cpu-push (c data)
-  (let* ((register (nes/cpu->register c))
+(defun nes/cpu-push (cpu data)
+  "Push DATA to stack of CPU."
+  (let* ((register (nes/cpu->register cpu))
          (addr (nes/cpu-register->sp register)))
-    (nes/cpu-write c (logior #x100 (logand addr #x0ff)) data)
+    (nes/cpu-write cpu (logior #x100 (logand addr #x0ff)) data)
     (setf (nes/cpu-register->sp register) (1- addr))))
 
-(defun nes/cpu-pull (c)
-  (let* ((register (nes/cpu->register c))
+(defun nes/cpu-pull (cpu)
+  "Pull byte from stack of CPU."
+  (let* ((register (nes/cpu->register cpu))
          (addr (1+ (nes/cpu-register->sp register))))
     (setf (nes/cpu-register->sp register) addr)
-    (nes/cpu-read c (logior #x100 (logand addr #x0ff)))))
+    (nes/cpu-read cpu (logior #x100 (logand addr #x0ff)))))
 
-(defun nes/cpu-status-register (c)
-  (let ((r (nes/cpu->register c)))
+(defun nes/cpu-status-register (cpu)
+  "Return status register of CPU."
+  (let ((r (nes/cpu->register cpu)))
     (logior (ash (if (nes/cpu-register->sr-negative r)  1 0) 7)
             (ash (if (nes/cpu-register->sr-overflow r)  1 0) 6)
             (ash (if (nes/cpu-register->sr-reserved r)  1 0) 5)
@@ -131,11 +136,11 @@
     (setf (nes/cpu-register->sr-zero r)      (nes--logbitp 1 data))
     (setf (nes/cpu-register->sr-carry r)     (nes--logbitp 0 data))))
 
-
-(defun nes/cpu-reset (c)
-  (let ((r (nes/cpu->register c)))
-    (setf (nes/cpu-register->sp r) #xfd)
-    (setf (nes/cpu-register->pc r) (nes/cpu-read c #xfffc :word))
+(defun nes/cpu-reset (cpu)
+  "Reset CPU."
+  (let ((r (nes/cpu->register cpu)))
+    (setf (nes/cpu-register->sp r) #xFD)
+    (setf (nes/cpu-register->pc r) (nes/cpu-read cpu #xFFFC :word))
     (setf (nes/cpu-register->sr-carry r) nil)
     (setf (nes/cpu-register->sr-zero r) nil)
     (setf (nes/cpu-register->sr-interrupt r) t)
@@ -143,8 +148,7 @@
     (setf (nes/cpu-register->sr-break r) t)
     (setf (nes/cpu-register->sr-reserved r) t)
     (setf (nes/cpu-register->sr-overflow r) nil)
-    (setf (nes/cpu-register->sr-negative r) nil)
-    ))
+    (setf (nes/cpu-register->sr-negative r) nil)))
 
 (defun nes/cpu-nmi (c)
   (let ((register (nes/cpu->register c)))
@@ -164,53 +168,74 @@
     (setf (nes/cpu-register->sr-interrupt register) t)
     (setf (nes/cpu-register->pc register) (nes/cpu-read c #xfffe :word))))
 
-(defun nes/cpu--get-instruction-operand-and-cycle (c mode)
-  (let ((register (nes/cpu->register c)))
+(defun nes/cpu--get-instruction-operand-and-cycle (cpu mode)
+  "Return current instruction operand given an addressing MODE of CPU."
+  (let ((register (nes/cpu->register cpu)))
     (cl-case mode
+      ;; Accumulator
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#A
       (:accumulator
        '(nil . 0))
 
+      ;; Implied
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#-
       (:implied
        '(nil . 0))
 
+      ;; Immediate
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3##d8
       (:immediate
-       (cons (nes/cpu--fetch c) 0))
+       (cons (nes/cpu--fetch cpu) 0))
 
+      ;; Relative
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#r8
       (:relative
-       (let* ((base-addr (nes/cpu--fetch c))
+       (let* ((base-addr (nes/cpu--fetch cpu))
               (addr (if (< base-addr #x80)
                         (+ base-addr (nes/cpu-register->pc register))
                       (- (+ base-addr (nes/cpu-register->pc register)) 256)))
               (cycle (if (not (eq (logand addr #xFF00) (logand (nes/cpu-register->pc register) #xFF00))) 1 0)))
          (cons addr cycle)))
 
+      ;; Zero Page
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#r8
       (:zero-page
-       (cons (nes/cpu--fetch c) 0))
+       (cons (nes/cpu--fetch cpu) 0))
 
+      ;; X-Indexed Zero Page
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#a8,X
       (:zero-page-x
-       (cons (logand (+ (nes/cpu--fetch c)
+       (cons (logand (+ (nes/cpu--fetch cpu)
                         (nes/cpu-register->idx-x register))
                      #xFF)
              0))
 
+      ;; Y-Indexed Zero Page
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#a8,Y
       (:zero-page-y
-       (cons (logand (+ (nes/cpu--fetch c)
+       (cons (logand (+ (nes/cpu--fetch cpu)
                         (nes/cpu-register->idx-y register))
                      #xFF)
              0))
 
+      ;; Absolute
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16
       (:absolute
-       (cons (nes/cpu--fetch c :word) 0))
+       (cons (nes/cpu--fetch cpu :word) 0))
 
+      ;; X-Indexed Absolute
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16,X
       (:absolute-x
-       (let* ((addr (nes/cpu--fetch c :word))
+       (let* ((addr (nes/cpu--fetch cpu :word))
               (idx-x (nes/cpu-register->idx-x register))
               (cycle (if (eq (logand addr #xFF00) (logand (+ addr idx-x) #xFF00))
                          0 1)))
          (cons (logand (+ addr idx-x) #xFFFF) cycle)))
 
+      ;; Y-Indexed Absolute
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16,Y
       (:absolute-y
-       (let* ((addr (nes/cpu--fetch c :word))
+       (let* ((addr (nes/cpu--fetch cpu :word))
               (idx-y (nes/cpu-register->idx-y register))
               (cycle (if (eq (logand addr #xFF00) (logand (+ addr idx-y) #xFF00))
                          0 1)))
@@ -219,43 +244,44 @@
       ;; X-Indexed Zero Page Indirect
       ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8,X)
       (:pre-indexed-indirect
-       (let* ((base-addr (logand (+ (nes/cpu--fetch c) (nes/cpu-register->idx-x register))
+       (let* ((base-addr (logand (+ (nes/cpu--fetch cpu) (nes/cpu-register->idx-x register))
                                  #xFF))
-              (addr (logand (+ (nes/cpu-read c base-addr)
-                               (ash (nes/cpu-read c (logand (1+ base-addr) #xFF)) 8))
+              (addr (logand (+ (nes/cpu-read cpu base-addr)
+                               (ash (nes/cpu-read cpu (logand (1+ base-addr) #xFF)) 8))
                             #xFFFF))
               ;; (cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0))
               )
          (cons addr 0)))
 
       ;; Zero Page Indirect Y-Indexed
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8),Y
       (:post-indexed-indirect
-       (let* ((data-addr (nes/cpu--fetch c))
-              (base-addr (+ (nes/cpu-read c data-addr)
-                            (ash (nes/cpu-read c (logand (1+ data-addr) #xFF)) 8)))
+       (let* ((data-addr (nes/cpu--fetch cpu))
+              (base-addr (+ (nes/cpu-read cpu data-addr)
+                            (ash (nes/cpu-read cpu (logand (1+ data-addr) #xFF)) 8)))
               (addr (logand (+ base-addr (nes/cpu-register->idx-y register)) #xFFFF))
               (cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0)))
          (cons addr cycle)))
 
+      ;; Absolute Indirect
+      ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a16)
       (:indirect-absolute
-       (let ((data-addr (nes/cpu--fetch c :word)))
-         (cons (logand (+ (nes/cpu-read c data-addr)
-                          (ash (nes/cpu-read c (logior (logand data-addr #xFF00)
+       (let ((data-addr (nes/cpu--fetch cpu :word)))
+         (cons (logand (+ (nes/cpu-read cpu data-addr)
+                          (ash (nes/cpu-read cpu (logior (logand data-addr #xFF00)
                                                        (logand (1+ (logand data-addr #xFF)) #xFF)))
                                8))
                        #xFFFF)
                0))))))
 
-(defun nes/cpu--peek (c &optional size)
-  (let ((size (or size :byte))
-        (addr (nes/cpu-register->pc (nes/cpu->register c))))
-    (nes/cpu-read c addr size)))
+(defun nes/cpu--fetch (cpu &optional size)
+  "Read SIZE data at program counter of CPU bus.
 
-(defun nes/cpu--fetch (c &optional size)
+SIZE can be :byte or :word"
   (let ((size (or size :byte))
-        (addr (nes/cpu-register->pc (nes/cpu->register c))))
-    (cl-incf (nes/cpu-register->pc (nes/cpu->register c)) (if (eq size :word) 2 1))
-    (nes/cpu-read c addr size)))
+        (addr (nes/cpu-register->pc (nes/cpu->register cpu))))
+    (cl-incf (nes/cpu-register->pc (nes/cpu->register cpu)) (if (eq size :word) 2 1))
+    (nes/cpu-read cpu addr size)))
 
 (defun nes/cpu-set-working-ram (cpu ram)
   (setf (nes/cpu-bus->ram (nes/cpu->bus cpu)) ram))

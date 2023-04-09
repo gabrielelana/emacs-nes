@@ -147,6 +147,48 @@
   (setq nes--current-cartridge-filename filename)
   (nes-mode))
 
+
+;;; TODO: remove this
+;; (require 'f)
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "nestest.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "cpu_dummy_reads.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "cpu_dummy_writes_oam.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "cpu_dummy_writes_ppumem.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "scanline.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "smb.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "dk.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "dkc.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "tetris.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "test/branch-timing" "branch-basics.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "full_palette.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "full_nes_palette.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "full_palette_smooth.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "flowing_palette.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "test_cpu_exec_space_ppuio.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "color_test.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "pulsar.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "nestopia.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "instr_misc.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "ballon-flight.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "genie.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "falling.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms" "tutor.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/instr-test-v5" "all_instrs.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/instr-test-v5" "official_only.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/instr-test-v3" "all_instrs.nes")) ; failing
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/instr-test-v3" "official_only.nes")) ; OK!
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "01.basics.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "02.alignment.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "03.corners.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "04.flip.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "05.left_clip.nes")) ; failing
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "06.right_edge.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "07.screen_bottom.nes")) ; failing
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "08.double_height.nes"))
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "09.timing_basics.nes")) ; failing
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "10.timing_order.nes")) ; failing
+;; (nes (f-join (f-dirname (buffer-file-name)) "roms/sprite-hit" "11.edge_timing.nes")) ; failing
+
 (provide 'nes)
 
 ;; Local Variables:

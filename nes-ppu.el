@@ -103,11 +103,13 @@
    ((<= addr #x3EFF) (nes/ppu--bus-read b (- addr #x1000)))              ;; mirror to #x2000 - #x2EFF
    ((or (eq addr #x3F04)
         (eq addr #x3F08)
-        (eq addr #x3F0C)) (nes/ppu--bus-read b #x3F00))                  ;; Use #x3F00 because these are unique data and not used by PPU
+        (eq addr #x3F0C))
+    (nes/ppu--bus-read b #x3F00))                  ;; Use #x3F00 because these are unique data and not used by PPU
    ((or (eq addr #x3F10)
         (eq addr #x3F14)
         (eq addr #x3F18)
-        (eq addr #x3F1C)) (nes/ppu--bus-read b (- addr #x0010)))         ;; mirror to #x3F00, #x3F04, #x3F08 and #x3F0C
+        (eq addr #x3F1C))
+    (nes/ppu--bus-read b (- addr #x0010)))         ;; mirror to #x3F00, #x3F04, #x3F08 and #x3F0C
    ((<= addr #x3F1F) (aref (nes/ppu-bus->video-ram b) (- addr #x2000)))
    ((<= addr #x3FFF) (nes/ppu--bus-read b (- addr #x0020)))              ;; mirror to #x3F00 - #x3F1F
    ;; (t 0)
