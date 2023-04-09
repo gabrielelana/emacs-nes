@@ -462,14 +462,14 @@
     (let ((coarse-y (nes/ppu--coarse-y-scroll ppu))
           (y 0))
       (nes/ppu--clear-fine-y-scroll ppu)
-      (cl-case coarse-y
-       (29
+      (cond
+       ((eq coarse-y 29)
         (nes/ppu--toggle-vertical-name-table-select ppu))
-       ;; (31
-       ;;  (setq y 0))
+       ;; ((eq coarse-y 31)
+       ;;  (setq y
        (t
-        (setq y (1+ coarse-y))
-        ))
+        (setq y
+              (1+ coarse-y))))
       (nes/ppu--set-coarse-y-scroll ppu y))))
 
 (defun nes/ppu--nmi-change (ppu)
