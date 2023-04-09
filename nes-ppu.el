@@ -47,6 +47,8 @@
                (:conc-name nes/ppu->))
   (cycle 0)
   (line 0)
+  (frame 0)
+  (last-frame-at nil)
   (bus (make-nes/ppu-bus))
   (sprite-ram (make-vector nes/ppu:SPRITE-RAM-BYTESIZE 0))
   (sprite-ram-addr #x00)
@@ -417,11 +419,20 @@
     (cl-incf (nes/ppu->cycle ppu))
 
     (let ((right-end-cycle-p (>= (nes/ppu->cycle ppu) nes/ppu:CYCLES-PER-LINE))
+          ;; TODO: rename ->line into ->scanline
+          ;; TODO: define constant nes/ppu::SCANLINES-PER-FRAME
           (bottom-end-line-p (>= (nes/ppu->line ppu) (+ nes/ppu:SCREEN-HEIGHT nes/ppu:VBLANK-HEIGHT))))
       (when right-end-cycle-p
         (setf (nes/ppu->cycle ppu) 0)
         (cl-incf (nes/ppu->line ppu))
         (when bottom-end-line-p
+          ;; end of frame
+          ;; TODO: print only if debug mode is enabled
+          ;; TODO: enable/disable debug mode
+          ;; (when (nes/ppu->last-frame-at ppu)
+          ;;   (message "%05d (FPS: %f)" (nes/ppu->frame ppu) (/ 1 (float-time (time-since (nes/ppu->last-frame-at ppu))))))
+          (cl-incf (nes/ppu->frame ppu))
+          (setf (nes/ppu->last-frame-at ppu) (current-time))
           (setf (nes/ppu->line ppu) 0)
           (setf (nes/ppu->f ppu) (logxor (nes/ppu->f ppu) 1)))))))
 
