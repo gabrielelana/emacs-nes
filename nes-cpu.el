@@ -281,37 +281,54 @@ SIZE can be :byte or :word"
 (defun nes/cpu-set-program-rom (cpu rom-func)
   (setf (nes/cpu-bus->prg-rom (nes/cpu->bus cpu)) rom-func))
 
-(defun nes/cpu-step (c)
-  (when (nes/interrupt->nmi (nes/cpu->interrupt c))
-    (nes/cpu-nmi c))
-  (nes/interrupt-clear (nes/cpu->interrupt c))
-  (let* ((opcode (nes/cpu--fetch c))
-         (inst (aref nes/instruction:MAP opcode))
-         (operand-and-cycle (nes/cpu--get-instruction-operand-and-cycle c (nes/instruction->mode inst)))
-         (operand (car operand-and-cycle))
-         (inst-cycle (aref nes/instruction:CYCLES opcode))
-         (add-cycle (cdr operand-and-cycle)))
-    ;; TODO: make nes/cpu->cycles accumulate all the cycles with as 16 bit counter
-    (setf (nes/cpu->cycles c) 0)
-    (funcall (nes/instruction->func inst) c operand (nes/instruction->mode inst))
-    (+ (nes/cpu->cycles c)
-       inst-cycle
+;; TODO: make nes/cpu->cycles accumulate all the cycles with as 16 bit counter
+(let  (opcode
+       instruction
+       instruction-mode
+       instruction-name
+       operand-and-cycle
+       operand
+       instruction-cycles
+       penalty-cycles)
+  (defun nes/cpu-step (cpu)
+    "Make CPU run next instruction."
+    (when (nes/interrupt->nmi (nes/cpu->interrupt cpu))
+      (nes/cpu-nmi cpu))
+    (nes/interrupt-clear (nes/cpu->interrupt cpu))
+    (setq opcode (nes/cpu--fetch cpu)
+          instruction (aref nes/instruction:MAP opcode)
+          instruction-mode (nes/instruction->mode instruction)
+          instruction-name (nes/instruction->name instruction)
+          operand-and-cycle (nes/cpu--get-instruction-operand-and-cycle cpu instruction-mode)
+          operand (car operand-and-cycle)
+          instruction-cycles (aref nes/instruction:CYCLES opcode)
+          penalty-cycles (cdr operand-and-cycle))
+    (setf (nes/cpu->cycles cpu) 0)
+    (funcall (nes/instruction->func instruction) cpu operand instruction-mode)
+    (+ (nes/cpu->cycles cpu)
+       instruction-cycles
        ;; NOTE: we are going to pay the extra cycle for crossing memory page
        ;; only if the op did something aka changed the cycle aka ex. jumped
        ;; TODO: make nes/instruction-* take cycles parameter
        ;; TODO: make nes/instruction-* take penalty-cycle parameter
        ;; TODO: make nes/instruction-* function return taken-cycles
        (if (or
-            (equal "LDA" (nes/instruction->name inst))
-            (equal "LDX" (nes/instruction->name inst))
-            (equal "LDY" (nes/instruction->name inst))
-            (equal "LAX" (nes/instruction->name inst))
-            (equal "NOPI" (nes/instruction->name inst))
-            (> (nes/cpu->cycles c) 0))
-           add-cycle
+            (equal "LDA" instruction-name)
+            (equal "LDX" instruction-name)
+            (equal "LDY" instruction-name)
+            (equal "LAX" instruction-name)
+            (equal "NOPI" instruction-name)
+            (> (nes/cpu->cycles cpu) 0))
+           penalty-cycles
          0))))
 
-(defun nes/cpu-init (c)
-  (nes/cpu-reset c))
+(defun nes/cpu-init (cpu)
+  "Init CPU."
+  (nes/cpu-reset cpu))
 
 (provide 'nes-cpu)
+
+;; Local Variables:
+;; coding: utf-8
+;; End:
+;;; nes-cpu.el ends here
