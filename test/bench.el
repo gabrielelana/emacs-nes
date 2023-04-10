@@ -38,7 +38,7 @@
 
 ;;; TODO: save somewhere the best result based on the name of the rom
 (defconst NES/EMULATOR-US-PER-OP
-  6.83
+  2.1
   "Emulator: microseconds per OP (best recorded so far).")
 
 (defmacro bench-rom (repeat steps rom-path &optional setup)
