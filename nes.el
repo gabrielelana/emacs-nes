@@ -115,15 +115,16 @@
      :canvas canvas)))
 
 (defun nes-update ()
-  (let ((buffer (get-buffer nes-buffer-name)))
+  (let ((buffer (get-buffer nes-buffer-name))
+        cpu-cycles)
     (when (eq (current-buffer) buffer)
       (let ((c (nes-cpu nes--current-game))
             (p (nes-ppu nes--current-game))
             (d (nes-dma nes--current-game)))
         (nes/dma-transfer d)
         (dotimes (_ 3000)
-          (dotimes (_ (* (nes/cpu-step c) 3))
-            (nes/ppu-step p)))))
+          (setq cpu-cycles (nes/cpu-step c))
+          (nes/ppu-step-count p (* cpu-cycles 3)))))
     (when buffer
       (run-at-time 0.001 nil 'nes-update))))
 

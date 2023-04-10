@@ -41,8 +41,7 @@
            (r (nes/cpu->register c))
            (cyc 7)
            (log (f-read-text "/home/coder/code/emacs-nes/test/nestest.log"))
-           (line-counter 0)
-           )
+           (line-counter 0))
       ;; this.emulator.cpu.reset();
       ;; this.emulator.cpu.registers.PC = 0xC000;
       (setf (nes/cpu-register->pc r) #xc000)
@@ -65,10 +64,9 @@
                (expected (concat line-header (substring line 0 4) " " (substring line 48)))
                (given (concat line-header (nes/snapshot c p r cyc))))
           (should (equal expected given))
-          (let ((step-cyc (nes/cpu-step c)))
-            (cl-incf cyc step-cyc)
-            (dotimes (_ (* step-cyc 3))
-              (nes/ppu-step p)))))
+          (let ((cpu-cycles (nes/cpu-step c)))
+            (cl-incf cyc cpu-cycles)
+            (nes/ppu-step-count p (* cpu-cycles 3)))))
       (should (equal #x00 (nes/cpu-read c #x02)))
       (should (equal #x00 (nes/cpu-read c #x03))))))
 

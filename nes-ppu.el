@@ -316,86 +316,80 @@
 ;;
 ;; https://wiki.nesdev.com/w/index.php/PPU_rendering#Line-by-line_timing
 ;;
-;; TODO: document local variables
-(let (rendering-enabled-p
-      scanline
-      pre-render-line-p
-      visible-line-p
-      render-line-p
-      cycle
-      cycle-8
-      pre-fetch-cycle-p
-      visible-cycle-p
-      fetch-cycle-p
-      current-canvas
-      previous-canvas)
-  (defun nes/ppu-step (ppu)
-          (nes/ppu--tick ppu)
+(defun nes/ppu-step (ppu)
+  "Execute one step (clock) of the PPU."
+  (nes/ppu-step-count ppu 1))
 
-          (setq rendering-enabled-p (or (nes/ppu--background-enabled-p ppu)
-                                        (nes/ppu--sprite-enabled-p ppu))
-                scanline (nes/ppu->line ppu)
-                pre-render-line-p (eq scanline 261)
-                visible-line-p (< scanline 240)
-                render-line-p (or pre-render-line-p visible-line-p)
-                cycle (nes/ppu->cycle ppu)
-                cycle-8 (% cycle 8)
-                pre-fetch-cycle-p (<= 321 cycle 336)
-                visible-cycle-p (<= 1 cycle 256)
-                fetch-cycle-p (or pre-fetch-cycle-p visible-cycle-p)
-                current-canvas (nes/ppu->current-canvas ppu)
-                previous-canvas (nes/ppu->previous-canvas ppu))
+;;
+;; https://wiki.nesdev.com/w/index.php/PPU_rendering#Line-by-line_timing
+;;
+(defun nes/ppu-step-count (ppu count)
+  "Execute COUNT step (clock) of the PPU."
+  (dotimes (_ count)
+    (nes/ppu--tick ppu)
 
-          (when rendering-enabled-p
-            ;;
-            ;; background logic
-            ;;
-            (when (and visible-line-p visible-cycle-p)
-              (nes/ppu--render-pixel ppu))
+    (let* ((rendering-enabled-p (or (nes/ppu--background-enabled-p ppu)
+                                    (nes/ppu--sprite-enabled-p ppu)))
+           (scanline (nes/ppu->line ppu))
+           (pre-render-line-p (eq scanline 261))
+           (visible-line-p (< scanline 240))
+           (render-line-p (or pre-render-line-p visible-line-p))
+           (cycle (nes/ppu->cycle ppu))
+           (cycle-8 (% cycle 8))
+           (pre-fetch-cycle-p (<= 321 cycle 336))
+           (visible-cycle-p (<= 1 cycle 256))
+           (fetch-cycle-p (or pre-fetch-cycle-p visible-cycle-p))
+           (current-canvas (nes/ppu->current-canvas ppu))
+           (previous-canvas (nes/ppu->previous-canvas ppu)))
 
-            (when (and render-line-p fetch-cycle-p)
-              (setf (nes/ppu->tile-data2 ppu) (logior (logand #xFFFFFFF0 (ash (nes/ppu->tile-data2 ppu) 4))
-                                                      (logand (ash (nes/ppu->tile-data1 ppu) -28) #b1111)))
-              (setf (nes/ppu->tile-data1 ppu) (logand #xFFFFFFFF (ash (nes/ppu->tile-data1 ppu) 4)))
-              (cond
-               ((eq cycle-8 1)
-                (nes/ppu--fetch-current-name-table-byte ppu))
-               ((eq cycle-8 3)
-                (nes/ppu--fetch-current-attribute-table-byte ppu))
-               ((eq cycle-8 5)
-                (nes/ppu--fetch-current-tile-low-byte ppu))
-               ((eq cycle-8 7)
-                (nes/ppu--fetch-current-tile-hi-byte ppu))
-               ((eq cycle-8 0)
-                (nes/ppu--store-current-tile-data ppu))))
+      (when rendering-enabled-p
+        ;; background logic
+        (when (and visible-line-p visible-cycle-p)
+          (nes/ppu--render-pixel ppu))
 
-            (when (and pre-render-line-p (<= 280 cycle 304))
-              (nes/ppu--copy-y ppu))
+        (when (and render-line-p fetch-cycle-p)
+          (setf (nes/ppu->tile-data2 ppu) (logior (logand #xFFFFFFF0 (ash (nes/ppu->tile-data2 ppu) 4))
+                                                  (logand (ash (nes/ppu->tile-data1 ppu) -28) #b1111)))
+          (setf (nes/ppu->tile-data1 ppu) (logand #xFFFFFFFF (ash (nes/ppu->tile-data1 ppu) 4)))
+          (cond
+           ((eq cycle-8 1)
+            (nes/ppu--fetch-current-name-table-byte ppu))
+           ((eq cycle-8 3)
+            (nes/ppu--fetch-current-attribute-table-byte ppu))
+           ((eq cycle-8 5)
+            (nes/ppu--fetch-current-tile-low-byte ppu))
+           ((eq cycle-8 7)
+            (nes/ppu--fetch-current-tile-hi-byte ppu))
+           ((eq cycle-8 0)
+            (nes/ppu--store-current-tile-data ppu))))
 
-            (when render-line-p
-              (when (and fetch-cycle-p (zerop (% cycle 8)))
-                (nes/ppu--increment-x ppu))
-              (when (eq cycle 256)
-                (nes/ppu--increment-y ppu))
-              (when (eq cycle 257)
-                (nes/ppu--copy-x ppu)))
+        (when (and pre-render-line-p (<= 280 cycle 304))
+          (nes/ppu--copy-y ppu))
 
-            ;; sprite logic
-            (when (eq cycle 257)
-              (if visible-line-p
-                  (nes/ppu--evaluate-sprites ppu)
-                (setf (nes/ppu->sprite-count ppu) 0))))
+        (when render-line-p
+          (when (and fetch-cycle-p (zerop (% cycle 8)))
+            (nes/ppu--increment-x ppu))
+          (when (eq cycle 256)
+            (nes/ppu--increment-y ppu))
+          (when (eq cycle 257)
+            (nes/ppu--copy-x ppu)))
 
-          (when (and (eq scanline 241) (eq cycle 1))
-            (retro--buffer-render current-canvas previous-canvas)
-            (retro--reset-canvas previous-canvas)
-            (cl-rotatef (nes/ppu->current-canvas ppu) (nes/ppu->previous-canvas ppu))
-            (nes/ppu--set-vblank ppu))
+        ;; sprite logic
+        (when (eq cycle 257)
+          (if visible-line-p
+              (nes/ppu--evaluate-sprites ppu)
+            (setf (nes/ppu->sprite-count ppu) 0))))
 
-          (when (and pre-render-line-p (eq cycle 1))
-            (nes/ppu--clear-vblank ppu)
-            (nes/ppu--clear-sprite-zero-hit ppu)
-            (nes/ppu--clear-sprite-overflow ppu))))
+      (when (and (eq scanline 241) (eq cycle 1))
+        (retro--buffer-render current-canvas previous-canvas)
+        (retro--reset-canvas previous-canvas)
+        (cl-rotatef (nes/ppu->current-canvas ppu) (nes/ppu->previous-canvas ppu))
+        (nes/ppu--set-vblank ppu))
+
+      (when (and pre-render-line-p (eq cycle 1))
+        (nes/ppu--clear-vblank ppu)
+        (nes/ppu--clear-sprite-zero-hit ppu)
+        (nes/ppu--clear-sprite-overflow ppu)))))
 
 (defun nes/ppu--tick (ppu)
   (when (> (nes/ppu->nmi-delay ppu) 0)
