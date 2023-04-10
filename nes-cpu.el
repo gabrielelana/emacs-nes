@@ -160,109 +160,108 @@ SIZE can be :byte or :word"
     (setf (nes/cpu-register->sr-interrupt register) t)
     (setf (nes/cpu-register->pc register) (nes/cpu-read c #xfffe :word))))
 
-(let (register
-      base-addr
-      data-addr
-      addr
-      idx-x
-      idx-y
-      cycle)
-  (defun nes/cpu--get-instruction-operand-and-cycle (cpu mode)
-          "Return current instruction operand given an addressing MODE of CPU."
-          (setq register (nes/cpu->register cpu))
-          ;; Sorted, most used addressing mode first, according to
-          ;; http://blargg.8bitalley.com/nes-emu/6502.html
-          (cond
-           ;; Zero Page
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#r8
-           ((eq mode :zero-page)
-            (cons (nes/cpu--fetch cpu) 0))
-           ;; Absolute
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16
-           ((eq mode :absolute)
-            (cons (nes/cpu--fetch cpu :word) 0))
-           ;; Immediate
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3##d8
-           ((eq mode :immediate)
-            (cons (nes/cpu--fetch cpu) 0))
-           ;; X-Indexed Absolute
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16,X
-           ((eq mode :absolute-x)
-            (setq addr (nes/cpu--fetch cpu :word)
-                  idx-x (nes/cpu-register->idx-x register)
-                  cycle (if (eq (logand addr #xFF00) (logand (+ addr idx-x) #xFF00))
-                            0
-                          1))
-            (cons (logand (+ addr idx-x) #xFFFF) cycle))
-           ;; Accumulator
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#A
-           ((eq mode :accumulator)
-            '(nil . 0))
-           ;; X-Indexed Zero Page
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#a8,X
-           ((eq mode :zero-page-x)
-            (cons (logand (+ (nes/cpu--fetch cpu)
-                             (nes/cpu-register->idx-x register))
-                          #xFF)
-                  0))
-           ;; Y-Indexed Zero Page
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#a8,Y
-           ((eq mode :zero-page-y)
-            (cons (logand (+ (nes/cpu--fetch cpu)
-                             (nes/cpu-register->idx-y register))
-                          #xFF)
-                  0))
-           ;; Implied
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#-
-           ((eq mode :implied)
-            '(nil . 0))
-           ;; Relative
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#r8
-           ((eq mode :relative)
-            (setq base-addr (nes/cpu--fetch cpu)
-                  addr (if (< base-addr #x80)
-                           (+ base-addr (nes/cpu-register->pc register))
-                         (- (+ base-addr (nes/cpu-register->pc register)) 256))
-                  cycle (if (not (eq (logand addr #xFF00) (logand (nes/cpu-register->pc register) #xFF00))) 1 0))
-            (cons addr cycle))
-           ;; Y-Indexed Absolute
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16,Y
-           ((eq mode :absolute-y)
-            (setq addr (nes/cpu--fetch cpu :word)
-                  idx-y (nes/cpu-register->idx-y register)
-                  cycle (if (eq (logand addr #xFF00) (logand (+ addr idx-y) #xFF00))
-                            0 1))
-            (cons (logand (+ addr idx-y) #xFFFF) cycle))
-           ;; X-Indexed Zero Page Indirect
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8,X)
-           ((eq mode :pre-indexed-indirect)
-            (setq base-addr (logand (+ (nes/cpu--fetch cpu) (nes/cpu-register->idx-x register))
-                                    #xFF)
-                  addr (logand (+ (nes/cpu-read cpu base-addr)
-                                  (ash (nes/cpu-read cpu (logand (1+ base-addr) #xFF)) 8))
-                               #xFFFF)
-                  ;; cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0)
-                  )
-            (cons addr 0))
-           ;; Zero Page Indirect Y-Indexed
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8),Y
-           ((eq mode :post-indexed-indirect)
-            (setq data-addr (nes/cpu--fetch cpu)
-                  base-addr (+ (nes/cpu-read cpu data-addr)
-                               (ash (nes/cpu-read cpu (logand (1+ data-addr) #xFF)) 8))
-                  addr (logand (+ base-addr (nes/cpu-register->idx-y register)) #xFFFF)
-                  cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0))
-            (cons addr cycle))
-           ;; Absolute Indirect
-           ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a16)
-           ((eq mode :indirect-absolute)
-            (setq data-addr (nes/cpu--fetch cpu :word))
-            (cons (logand (+ (nes/cpu-read cpu data-addr)
-                             (ash (nes/cpu-read cpu (logior (logand data-addr #xFF00)
-                                                            (logand (1+ (logand data-addr #xFF)) #xFF)))
-                                  8))
-                          #xFFFF)
-                  0)))))
+(defun nes/cpu--get-instruction-operand-and-cycle (cpu mode)
+  "Return current instruction operand given an addressing MODE of CPU."
+  (let ((register (nes/cpu->register cpu))
+        base-addr
+        data-addr
+        addr
+        idx-x
+        idx-y
+        cycle)
+    ;; Sorted, most used addressing mode first, according to
+    ;; http://blargg.8bitalley.com/nes-emu/6502.html
+    (cond
+     ;; Zero Page
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#r8
+     ((eq mode :zero-page)
+      (cons (nes/cpu--fetch cpu) 0))
+     ;; Absolute
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16
+     ((eq mode :absolute)
+      (cons (nes/cpu--fetch cpu :word) 0))
+     ;; Immediate
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3##d8
+     ((eq mode :immediate)
+      (cons (nes/cpu--fetch cpu) 0))
+     ;; X-Indexed Absolute
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16,X
+     ((eq mode :absolute-x)
+      (setq addr (nes/cpu--fetch cpu :word)
+            idx-x (nes/cpu-register->idx-x register)
+            cycle (if (eq (logand addr #xFF00) (logand (+ addr idx-x) #xFF00))
+                      0
+                    1))
+      (cons (logand (+ addr idx-x) #xFFFF) cycle))
+     ;; Accumulator
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#A
+     ((eq mode :accumulator)
+      '(nil . 0))
+     ;; X-Indexed Zero Page
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#a8,X
+     ((eq mode :zero-page-x)
+      (cons (logand (+ (nes/cpu--fetch cpu)
+                       (nes/cpu-register->idx-x register))
+                    #xFF)
+            0))
+     ;; Y-Indexed Zero Page
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#a8,Y
+     ((eq mode :zero-page-y)
+      (cons (logand (+ (nes/cpu--fetch cpu)
+                       (nes/cpu-register->idx-y register))
+                    #xFF)
+            0))
+     ;; Implied
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#-
+     ((eq mode :implied)
+      '(nil . 0))
+     ;; Relative
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#r8
+     ((eq mode :relative)
+      (setq base-addr (nes/cpu--fetch cpu)
+            addr (if (< base-addr #x80)
+                     (+ base-addr (nes/cpu-register->pc register))
+                   (- (+ base-addr (nes/cpu-register->pc register)) 256))
+            cycle (if (not (eq (logand addr #xFF00) (logand (nes/cpu-register->pc register) #xFF00))) 1 0))
+      (cons addr cycle))
+     ;; Y-Indexed Absolute
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#a16,Y
+     ((eq mode :absolute-y)
+      (setq addr (nes/cpu--fetch cpu :word)
+            idx-y (nes/cpu-register->idx-y register)
+            cycle (if (eq (logand addr #xFF00) (logand (+ addr idx-y) #xFF00))
+                      0 1))
+      (cons (logand (+ addr idx-y) #xFFFF) cycle))
+     ;; X-Indexed Zero Page Indirect
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8,X)
+     ((eq mode :pre-indexed-indirect)
+      (setq base-addr (logand (+ (nes/cpu--fetch cpu) (nes/cpu-register->idx-x register))
+                              #xFF)
+            addr (logand (+ (nes/cpu-read cpu base-addr)
+                            (ash (nes/cpu-read cpu (logand (1+ base-addr) #xFF)) 8))
+                         #xFFFF)
+            ;; cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0)
+            )
+      (cons addr 0))
+     ;; Zero Page Indirect Y-Indexed
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a8),Y
+     ((eq mode :post-indexed-indirect)
+      (setq data-addr (nes/cpu--fetch cpu)
+            base-addr (+ (nes/cpu-read cpu data-addr)
+                         (ash (nes/cpu-read cpu (logand (1+ data-addr) #xFF)) 8))
+            addr (logand (+ base-addr (nes/cpu-register->idx-y register)) #xFFFF)
+            cycle (if (/= (logand addr #xFF00) (logand base-addr #xFF00)) 1 0))
+      (cons addr cycle))
+     ;; Absolute Indirect
+     ;; https://www.pagetable.com/c64ref/6502/?tab=3#(a16)
+     ((eq mode :indirect-absolute)
+      (setq data-addr (nes/cpu--fetch cpu :word))
+      (cons (logand (+ (nes/cpu-read cpu data-addr)
+                       (ash (nes/cpu-read cpu (logior (logand data-addr #xFF00)
+                                                      (logand (1+ (logand data-addr #xFF)) #xFF)))
+                            8))
+                    #xFFFF)
+            0)))))
 
 (defun nes/cpu--fetch (cpu &optional size)
   "Read SIZE data at program counter of CPU bus.
@@ -280,27 +279,19 @@ SIZE can be :byte or :word"
   (setf (nes/cpu-bus->prg-rom (nes/cpu->bus cpu)) rom-func))
 
 ;; TODO: make nes/cpu->cycles accumulate all the cycles with as 16 bit counter
-(let  (opcode
-       instruction
-       instruction-mode
-       instruction-name
-       operand-and-cycle
-       operand
-       instruction-cycles
-       penalty-cycles)
-  (defun nes/cpu-step (cpu)
-    "Make CPU run next instruction."
-    (when (nes/interrupt->nmi (nes/cpu->interrupt cpu))
-      (nes/cpu-nmi cpu))
-    (nes/interrupt-clear (nes/cpu->interrupt cpu))
-    (setq opcode (nes/cpu--fetch cpu)
-          instruction (aref nes/instruction:MAP opcode)
-          instruction-mode (nes/instruction->mode instruction)
-          instruction-name (nes/instruction->name instruction)
-          operand-and-cycle (nes/cpu--get-instruction-operand-and-cycle cpu instruction-mode)
-          operand (car operand-and-cycle)
-          instruction-cycles (aref nes/instruction:CYCLES opcode)
-          penalty-cycles (cdr operand-and-cycle))
+(defun nes/cpu-step (cpu)
+  "Make CPU run next instruction."
+  (when (nes/interrupt->nmi (nes/cpu->interrupt cpu))
+    (nes/cpu-nmi cpu))
+  (nes/interrupt-clear (nes/cpu->interrupt cpu))
+  (let* ((opcode (nes/cpu--fetch cpu))
+         (instruction (aref nes/instruction:MAP opcode))
+         (instruction-mode (nes/instruction->mode instruction))
+         (instruction-name (nes/instruction->name instruction))
+         (operand-and-cycle (nes/cpu--get-instruction-operand-and-cycle cpu instruction-mode))
+         (operand (car operand-and-cycle))
+         (instruction-cycles (aref nes/instruction:CYCLES opcode))
+         (penalty-cycles (cdr operand-and-cycle)))
     (setf (nes/cpu->cycles cpu) 0)
     (funcall (nes/instruction->func instruction) cpu operand instruction-mode)
     (+ (nes/cpu->cycles cpu)
