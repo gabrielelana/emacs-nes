@@ -325,6 +325,7 @@
 ;;
 (defun nes/ppu-step-count (ppu count)
   "Execute COUNT step (clock) of the PPU."
+  (declare (speed 3))
   (dotimes (_ count)
     (nes/ppu--tick ppu)
 
