@@ -122,8 +122,10 @@
             (p (nes-ppu nes--current-game))
             (d (nes-dma nes--current-game)))
         (nes/dma-transfer d)
-        (dotimes (_ 3000)
-          (setq cpu-cycles (nes/cpu-step c))
+        (dotimes (_ 1024)
+          (setq cpu-cycles (+ (nes/cpu-step c)
+                              (nes/cpu-step c)
+                              (nes/cpu-step c)))
           (nes/ppu-step-count p (* cpu-cycles 3)))))
     (when buffer
       (run-at-time 0.001 nil 'nes-update))))
