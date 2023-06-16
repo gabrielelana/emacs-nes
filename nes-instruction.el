@@ -30,7 +30,6 @@
   mode
   cycle)
 
-
 (aset nes/instruction:MAP #xA9 (make-nes/instruction :func #'nes/instruction-lda :name "LDA" :mode :immediate))
 (aset nes/instruction:MAP #xA5 (make-nes/instruction :func #'nes/instruction-lda :name "LDA" :mode :zero-page))
 (aset nes/instruction:MAP #xAD (make-nes/instruction :func #'nes/instruction-lda :name "LDA" :mode :absolute))
@@ -295,9 +294,14 @@
 ;; Responding to recursive calls from nes-cpu
 (require 'nes-cpu)
 
-(defsubst nes/instruction--set-zero-and-negative-flags (r data)
-  (setf (nes/cpu-register->sr-zero r) (zerop (logand data #xFF)))
-  (setf (nes/cpu-register->sr-negative r) (nes--logbitp 7 data)))
+(defmacro nes/instruction--set-zero-and-negative-flags (r data)
+  "TODO R DATA."
+  `(progn
+    (setf (nes/cpu-register->sr-zero ,r) (zerop (logand ,data #xFF)))
+    (setf (nes/cpu-register->sr-negative ,r) (/= (logand ,data (ash 1 7)) 0)
+          ;; (nes--logbitp 7 ,data)
+          ))
+  )
 
 (defun nes/instruction-lda (c addr-or-data mode)
   "Load Accumulator"
