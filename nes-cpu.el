@@ -377,30 +377,30 @@ SIZE can be :byte or :word"
 
 (defun nes/cpu-pull-status-register (cpu)
   "Pull byte from stack and use it to set status register of CPU."
-  (let ((data (nes/cpu-pull cpu))
+  (let ((d (nes/cpu-pull cpu))
         (r (nes/cpu->register cpu)))
-    (setf (nes/cpu-register->sr-negative r)  (nes--logbitp 7 data))
-    (setf (nes/cpu-register->sr-overflow r)  (nes--logbitp 6 data))
-    (setf (nes/cpu-register->sr-reserved r)  (nes--logbitp 5 data))
-    (setf (nes/cpu-register->sr-break r)     (nes--logbitp 4 data))
-    (setf (nes/cpu-register->sr-decimal r)   (nes--logbitp 3 data))
-    (setf (nes/cpu-register->sr-interrupt r) (nes--logbitp 2 data))
-    (setf (nes/cpu-register->sr-zero r)      (nes--logbitp 1 data))
-    (setf (nes/cpu-register->sr-carry r)     (nes--logbitp 0 data))))
+    (setf (nes/cpu-register->sr-negative r)  (nes--logbitp 7 d)
+          (nes/cpu-register->sr-overflow r)  (nes--logbitp 6 d)
+          (nes/cpu-register->sr-reserved r)  (nes--logbitp 5 d)
+          (nes/cpu-register->sr-break r)     (nes--logbitp 4 d)
+          (nes/cpu-register->sr-decimal r)   (nes--logbitp 3 d)
+          (nes/cpu-register->sr-interrupt r) (nes--logbitp 2 d)
+          (nes/cpu-register->sr-zero r)      (nes--logbitp 1 d)
+          (nes/cpu-register->sr-carry r)     (nes--logbitp 0 d))))
 
 (defun nes/cpu-reset (cpu)
   "Reset CPU."
   (let ((r (nes/cpu->register cpu)))
-    (setf (nes/cpu-register->sp r) #xFD)
-    (setf (nes/cpu-register->pc r) (nes/cpu-read cpu #xFFFC :word))
-    (setf (nes/cpu-register->sr-carry r) nil)
-    (setf (nes/cpu-register->sr-zero r) nil)
-    (setf (nes/cpu-register->sr-interrupt r) t)
-    (setf (nes/cpu-register->sr-decimal r) nil)
-    (setf (nes/cpu-register->sr-break r) t)
-    (setf (nes/cpu-register->sr-reserved r) t)
-    (setf (nes/cpu-register->sr-overflow r) nil)
-    (setf (nes/cpu-register->sr-negative r) nil)))
+    (setf (nes/cpu-register->sp r) #xFD
+          (nes/cpu-register->pc r) (nes/cpu-read cpu #xFFFC :word)
+          (nes/cpu-register->sr-carry r) nil
+          (nes/cpu-register->sr-zero r) nil
+          (nes/cpu-register->sr-interrupt r) t
+          (nes/cpu-register->sr-decimal r) nil
+          (nes/cpu-register->sr-break r) t
+          (nes/cpu-register->sr-reserved r) t
+          (nes/cpu-register->sr-overflow r) nil
+          (nes/cpu-register->sr-negative r) nil)))
 
 (defun nes/cpu-nmi (c)
   (let ((register (nes/cpu->register c)))
@@ -409,16 +409,16 @@ SIZE can be :byte or :word"
     (nes/cpu-push c (logand #xFF (ash (nes/cpu-register->pc register) -8)))
     (nes/cpu-push c (logand #xFF (nes/cpu-register->pc register)))
     (nes/cpu-push-status-register c)
-    (setf (nes/cpu-register->sr-interrupt register) t)
-    (setf (nes/cpu-register->pc register) (nes/cpu-read c #xFFFA :word))))
+    (setf (nes/cpu-register->sr-interrupt register) t
+          (nes/cpu-register->pc register) (nes/cpu-read c #xFFFA :word))))
 
 (defun nes/cpu-irq (c)
   (let ((register (nes/cpu->register c)))
     (nes/cpu-push c (logand #xff (ash (nes/cpu-register->pc register) -8)))
     (nes/cpu-push c (logand #xff (nes/cpu-register->pc register)))
     (nes/cpu-push-status-register c)
-    (setf (nes/cpu-register->sr-interrupt register) t)
-    (setf (nes/cpu-register->pc register) (nes/cpu-read c #xfffe :word))))
+    (setf (nes/cpu-register->sr-interrupt register) t
+          (nes/cpu-register->pc register) (nes/cpu-read c #xfffe :word))))
 
 (defun nes/cpu--get-instruction-operand-and-cycle (cpu mode)
   "Return current operand and cycle's cost given an addressing MODE of CPU."
