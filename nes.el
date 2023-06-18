@@ -37,7 +37,6 @@
 (require 'nes-cpu)
 (require 'nes-dma)
 (require 'nes-keypad)
-(require 'nes-instruction)
 (require 'nes-interrupt)
 (require 'nes-color)
 (require 'nes-util)
@@ -123,9 +122,7 @@
             (d (nes-dma nes--current-game)))
         (nes/dma-transfer d)
         (dotimes (_ 1024)
-          (setq cpu-cycles (+ (nes/cpu-step c)
-                              (nes/cpu-step c)
-                              (nes/cpu-step c)))
+          (setq cpu-cycles (nes/cpu-step-count c 6))
           (nes/ppu-step-count p (* cpu-cycles 3)))))
     (when buffer
       (run-at-time 0.001 nil 'nes-update))))

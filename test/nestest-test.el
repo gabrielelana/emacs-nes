@@ -64,12 +64,11 @@
                (expected (concat line-header (substring line 0 4) " " (substring line 48)))
                (given (concat line-header (nes/snapshot c p r cyc))))
           (should (equal expected given))
-          (let ((cpu-cycles (nes/cpu-step c)))
+          (let ((cpu-cycles (nes/cpu-step-count c 1)))
             (cl-incf cyc cpu-cycles)
             (nes/ppu-step-count p (* cpu-cycles 3)))))
       (should (equal #x00 (nes/cpu-read c #x02)))
       (should (equal #x00 (nes/cpu-read c #x03))))))
-
 
 (defun nes/snapshot (cpu ppu reg cyc)
   "Return a string/line representing the current hw state.

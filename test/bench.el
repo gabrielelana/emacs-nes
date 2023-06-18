@@ -70,7 +70,7 @@ The cost of loading the rom is taken in consideration."
                                  (p (nes-ppu emulator)))
                             (,setup c r p)
                             (dotimes (_ ,steps)
-                              (let ((cpu-cycles (nes/cpu-step c)))
+                              (let ((cpu-cycles (nes/cpu-step-count c 1)))
                                 (nes/ppu-step-count p (* cpu-cycles))))))))
      (setq us-per-op (* (/ (- (nth 0 takes-to-run) (nth 0 takes-to-load)) repeat steps) 1000000))
      (message (concat "CPU current emulation speed: %f microseconds per op\n"
