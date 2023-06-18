@@ -548,425 +548,435 @@ SIZE can be :byte or :word"
 
 (defun nes/cpu-step-count (cpu count)
   "Execute next COUNT CPU instructions."
-  (let ((total-cycles 0))
+  (let ((total-cycles 0)
+        opcode
+        r0
+        sym
+        mode
+        cost
+        r1
+        op
+        penalty
+        register
+        data)
     (dotimes (_ count)
       (when (nes/interrupt->nmi (nes/cpu->interrupt cpu))
         (nes/cpu-nmi cpu))
       (nes/interrupt-clear (nes/cpu->interrupt cpu))
-      (let* ((opcode (nes/cpu--fetch cpu))
-             (r0 (aref nes/cpu--instructions opcode))
-             (sym (nth 0 r0))
-             (mode (nth 1 r0))
-             (cost (nth 2 r0))
-             (r1 (nes/cpu--get-instruction-operand-and-cycle cpu mode))
-             (op (car r1))
-             (penalty (cdr r1))
-             (register (nes/cpu->register cpu))
-             (data nil))
-        (setq total-cycles (+ total-cycles cost))
-        (cond
-         ;; LDA: Load Accumulator
-         ((eq sym :LDA)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op))
-                total-cycles (+ total-cycles penalty))
-          (setf (nes/cpu-register->acc register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; BNE
-         ((eq sym :BNE)
-          (unless (nes/cpu-register->sr-zero register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; JMP: Jump
-         ((eq sym :JMP)
-          (setf (nes/cpu-register->pc (nes/cpu->register cpu)) op))
-         ;; INX: Increment X Register
-         ((eq sym :INX)
-          (setq data (logand (1+ (nes/cpu-register->idx-x register)) #xff))
-          (setf (nes/cpu-register->idx-x register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; BPL
-         ((eq sym :BPL)
-          (unless (nes/cpu-register->sr-negative register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; CMP: Compare
-         ((eq sym :CMP)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let ((compared (- (nes/cpu-register->acc register) data)))
-            (nes/instruction--set-zero-and-negative-flags register compared)
-            (setf (nes/cpu-register->sr-carry register) (>= compared 0))))
-         ;; BMI
-         ((eq sym :BMI)
-          (when (nes/cpu-register->sr-negative register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; BEQ
-         ((eq sym :BEQ)
-          (when (nes/cpu-register->sr-zero register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; BIT
-         ((eq sym :BIT)
-          (setq data (nes/cpu-read cpu op))
-          (setf (nes/cpu-register->sr-negative register) (nes--logbitp 7 data)
-                (nes/cpu-register->sr-overflow register) (nes--logbitp 6 data)
-                (nes/cpu-register->sr-zero register) (zerop (logand (nes/cpu-register->acc register) data))))
-         ;; STA: Store Accumulator
-         ((eq sym :STA)
-          (nes/cpu-write cpu op (nes/cpu-register->acc (nes/cpu->register cpu))))
-         ;; DEX: Decrement X Register
-         ((eq sym :DEX)
-          (setq data (logand (1- (nes/cpu-register->idx-x register)) #xff))
-          (setf (nes/cpu-register->idx-x register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; INY: Increment Y Register
-         ((eq sym :INY)
-          (setq data (logand (1+ (nes/cpu-register->idx-y register)) #xff))
-          (setf (nes/cpu-register->idx-y register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; TAY: Transfer Accumulator to Y
-         ((eq sym :TAY)
-          (setq data (nes/cpu-register->acc register))
-          (setf (nes/cpu-register->idx-y register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; LDX: Load X Register
-         ((eq sym :LDX)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op))
-                total-cycles (+ total-cycles penalty))
-          (setf (nes/cpu-register->idx-x register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; LDY: Load Y Register
-         ((eq sym :LDY)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op))
-                total-cycles (+ total-cycles penalty))
-          (setf (nes/cpu-register->idx-y register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; STX: Store X Register
-         ((eq sym :STX)
-          (nes/cpu-write cpu op (nes/cpu-register->idx-x (nes/cpu->register cpu))))
-         ;; STY: Store Y Register
-         ((eq sym :STY)
-          (nes/cpu-write cpu op (nes/cpu-register->idx-y (nes/cpu->register cpu))))
-         ;; TAX: Transfer Accumulator to X
-         ((eq sym :TAX)
-          (setq data (nes/cpu-register->acc register))
-          (setf (nes/cpu-register->idx-x register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; TSX: Transfer Stack Pointer to X
-         ((eq sym :TSX)
-          (setq data (nes/cpu-register->sp register))
-          (setf (nes/cpu-register->idx-x register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; TXA: Transfer X to Accumulator
-         ((eq sym :TXA)
-          (setq data (nes/cpu-register->idx-x register))
-          (setf (nes/cpu-register->acc register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; TXS: Transfer X to Stack Pointer
-         ((eq sym :TXS)
-          (setf (nes/cpu-register->sp register)
-                (nes/cpu-register->idx-x register)))
-         ;; TYA: Transfer Y to Accumulator
-         ((eq sym :TYA)
-          (setq data (nes/cpu-register->idx-y register))
-          (setf (nes/cpu-register->acc register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; PHP: Push Processor Status
-         ;; In the byte pushed, bit 5 is always set to 1, and bit 4 is 1 if from an instruction (PHP or BRK)
-         ;; see https://wiki.nesdev.com/w/index.php/Status_flags#The_B_flag
-         ((eq sym :PHP)
-          (let ((old-break (nes/cpu-register->sr-break register))
-                (old-reserved (nes/cpu-register->sr-reserved register)))
-            (setf (nes/cpu-register->sr-break register) t
-                  (nes/cpu-register->sr-reserved register) t)
-            (nes/cpu-push-status-register cpu)
-            (setf (nes/cpu-register->sr-break register) old-break
-                  (nes/cpu-register->sr-reserved register) old-reserved)))
-         ;; PHA: Push Accumulator
-         ((eq sym :PHA)
-          (nes/cpu-push cpu (nes/cpu-register->acc (nes/cpu->register cpu))))
-         ;; PLA: Pull Accumulator
-         ((eq sym :PLA)
-          (setq data (nes/cpu-pull cpu))
-          (setf (nes/cpu-register->acc register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; PLP: Pull Processor Status
-         ;; Two instructions (PLP and RTI) pull a byte from the stack and set all the flags. They ignore bits 5 and 4.
-         ;; see https://wiki.nesdev.com/w/index.php/Status_flags#The_B_flag
-         ((eq sym :PLP)
-          (let ((current-break (nes/cpu-register->sr-break register))
-                (current-reserved (nes/cpu-register->sr-reserved register)))
-            (nes/cpu-pull-status-register cpu)
-            (setf (nes/cpu-register->sr-break register) current-break
-                  (nes/cpu-register->sr-reserved register) current-reserved)))
-         ;; SEC: Set Carry Flag
-         ((eq sym :SEC)
-          (setf (nes/cpu-register->sr-carry (nes/cpu->register cpu)) t))
-         ;; SED: Set Decimal Flag
-         ((eq sym :SED)
-          (setf (nes/cpu-register->sr-decimal (nes/cpu->register cpu)) t))
-         ;; SEI: Set Interrupt Disable
-         ((eq sym :SEI)
-          (setf (nes/cpu-register->sr-interrupt (nes/cpu->register cpu)) t))
-         ;; CLC: Clear Carry Flag
-         ((eq sym :CLC)
-          (setf (nes/cpu-register->sr-carry (nes/cpu->register cpu)) nil))
-         ;; CLD: Clear Decimal Mode
-         ((eq sym :CLD)
-          (setf (nes/cpu-register->sr-decimal (nes/cpu->register cpu)) nil))
-         ;; CLI: Clear Interrupt Disable
-         ((eq sym :CLI)
-          (setf (nes/cpu-register->sr-interrupt (nes/cpu->register cpu)) nil))
-         ;; CLV: Clear Overflow Flag
-         ((eq sym :CLV)
-          (setf (nes/cpu-register->sr-overflow (nes/cpu->register cpu)) nil))
-         ;; INC: Increment Memory
-         ((eq sym :INC)
-          (setq data (logand (1+ (nes/cpu-read cpu op)) #xff))
-          (nes/cpu-write cpu op data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; DEC: Decrement Memory
-         ((eq sym :DEC)
-          (setq data (logand (1- (nes/cpu-read cpu op)) #xff))
-          (nes/cpu-write cpu op data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; DEY: Decrement Y Register
-         ((eq sym :DEY)
-          (setq data (logand (1- (nes/cpu-register->idx-y register)) #xff))
-          (setf (nes/cpu-register->idx-y register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; ADC: Add with Carry
-         ((eq sym :ADC)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let* ((acc (nes/cpu-register->acc register))
-                 (result (+ acc
-                            data
-                            (if (nes/cpu-register->sr-carry register)
-                                1 0))))
-            (nes/instruction--set-zero-and-negative-flags register result)
-            (setf (nes/cpu-register->sr-carry register) (> result #xff)
-                  (nes/cpu-register->sr-overflow register) (and (not (nes--logbitp 7 (logxor acc data)))
-                                                                (nes--logbitp 7 (logxor acc result)))
-                  (nes/cpu-register->acc register) (logand result #xFF))))
-         ;; SBC: Subtract with Carry
-         ((eq sym :SBC)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let* ((acc (nes/cpu-register->acc register))
-                 (result (- acc
-                            data
-                            (if (nes/cpu-register->sr-carry register)
-                                0 1))))
-            (nes/instruction--set-zero-and-negative-flags register result)
-            (setf (nes/cpu-register->sr-carry register) (>= result 0)
-                  (nes/cpu-register->sr-overflow register) (and (nes--logbitp 7 (logxor acc data))
-                                                                (nes--logbitp 7 (logxor acc result)))
-                  (nes/cpu-register->acc register) (logand result #xFF))))
-         ;; CPX: Compare X Register
-         ((eq sym :CPX)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let ((compared (- (nes/cpu-register->idx-x register) data)))
-            (nes/instruction--set-zero-and-negative-flags register compared)
-            (setf (nes/cpu-register->sr-carry register) (>= compared 0))))
-         ;; CPY: Compare Y Register
-         ((eq sym :CPY)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let ((compared (- (nes/cpu-register->idx-y register) data)))
-            (nes/instruction--set-zero-and-negative-flags register compared)
-            (setf (nes/cpu-register->sr-carry register) (>= compared 0))))
-         ;; AND: Logical And
-         ((eq sym :AND)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let ((result (logand (nes/cpu-register->acc register) data)))
-            (nes/instruction--set-zero-and-negative-flags register result)
-            (setf (nes/cpu-register->acc register) (logand result #xff))))
-         ;; ORA: Logical Inclusive OR
-         ((eq sym :ORA)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let ((result (logior (nes/cpu-register->acc register) data)))
-            (nes/instruction--set-zero-and-negative-flags register result)
-            (setf (nes/cpu-register->acc register) (logand result #xff))))
-         ;; EOR: Exclusive OR
-         ((eq sym :EOR)
-          (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
-          (let ((result (logxor (nes/cpu-register->acc register) data)))
-            (nes/instruction--set-zero-and-negative-flags register result)
-            (setf (nes/cpu-register->acc register) (logand result #xff))))
-         ;; ASL: Arithmetic Shift Left
-         ((eq sym :ASL)
-          (setq data (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op)))
-          (let ((shifted (logand (ash data 1) #xff)))
-            (setf (nes/cpu-register->sr-carry register) (nes--logbitp 7 data))
-            (nes/instruction--set-zero-and-negative-flags register shifted)
-            (if (eq mode :accumulator)
-                (setf (nes/cpu-register->acc register) shifted)
-              (nes/cpu-write cpu op shifted))))
-         ;; LSR: Logical Shift Right
-         ((eq sym :LSR)
-          (setq data (logand (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op))))
-          (let ((shifted (logand (ash data -1) #xff)))
-            (setf (nes/cpu-register->sr-carry register) (nes--logbitp 0 data))
-            (nes/instruction--set-zero-and-negative-flags register shifted)
-            (if (eq mode :accumulator)
-                (setf (nes/cpu-register->acc register) shifted)
-              (nes/cpu-write cpu op shifted))))
-         ;; ROL: Rotate Left
-         ((eq sym :ROL)
-          (setq data (logand (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op))))
-          (let* ((carry (nes/cpu-register->sr-carry register))
-                 (rotated (logand #xff
-                                  (logior (ash data 1) (if carry #x01 #x00)))))
-            (setf (nes/cpu-register->sr-carry register) (nes--logbitp 7 data))
-            (nes/instruction--set-zero-and-negative-flags register rotated)
-            (if (eq mode :accumulator)
-                (setf (nes/cpu-register->acc register) rotated)
-              (nes/cpu-write cpu op rotated))))
-         ;; ROR: Rotate Right
-         ((eq sym :ROR)
-          (setq data (logand (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op))))
-          (let* ((carry (nes/cpu-register->sr-carry register))
-                 (rotated (logand #xff
-                                  (logior (ash data -1) (if carry #x80 #x00)))))
-            (setf (nes/cpu-register->sr-carry register) (/= (logand data #x01) 0))
-            (nes/instruction--set-zero-and-negative-flags register rotated)
-            (if (eq mode :accumulator)
-                (setf (nes/cpu-register->acc register) rotated)
-              (nes/cpu-write cpu op rotated))))
-         ;; NOP: No Operation
-         ((eq sym :NOP)
-          ;; doesn nothing?
-          '())
-         ;; BVS
-         ((eq sym :BVS)
-          (when (nes/cpu-register->sr-overflow register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; BVC
-         ((eq sym :BVC)
-          (unless (nes/cpu-register->sr-overflow register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; BCS
-         ((eq sym :BCS)
-          (when (nes/cpu-register->sr-carry register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; BCC
-         ((eq sym :BCC)
-          (unless (nes/cpu-register->sr-carry register)
-            (setq total-cycles (+ total-cycles 1 penalty))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; BRK
-         ((eq sym :BRK)
-          (let ((interrupt (nes/cpu-register->sr-interrupt register)))
-            (setf (nes/cpu-register->sr-break register) t)
-            (cl-incf (nes/cpu-register->pc register))
-            (nes/cpu-push cpu (logand #xFF (ash (nes/cpu-register->pc register) -8)))
-            (nes/cpu-push cpu (logand #xFF (nes/cpu-register->pc register)))
-            (nes/cpu-push-status-register cpu)
-            (unless interrupt
-              (setf (nes/cpu-register->sr-interrupt register) t
-                    (nes/cpu-register->pc register) (nes/cpu-read cpu #xFFFE :word)))
-            (cl-decf (nes/cpu-register->pc register))))
-         ;; JSR
-         ((eq sym :JSR)
-          (let ((pc (1- (nes/cpu-register->pc register))))
-            (nes/cpu-push cpu (logand (ash pc -8) #xFF))
-            (nes/cpu-push cpu (logand pc #xFF))
-            (setf (nes/cpu-register->pc register) op)))
-         ;; RTS
-         ((eq sym :RTS)
-          (setf (nes/cpu-register->pc register) (1+ (logior (nes/cpu-pull cpu)
-                                                            (ash (nes/cpu-pull cpu) 8)))))
-         ;; RTI
-         ((eq sym :RTI)
+      (setq opcode (nes/cpu--fetch cpu)
+            r0 (aref nes/cpu--instructions opcode)
+            sym (nth 0 r0)
+            mode (nth 1 r0)
+            cost (nth 2 r0)
+            r1 (nes/cpu--get-instruction-operand-and-cycle cpu mode)
+            op (car r1)
+            penalty (cdr r1)
+            register (nes/cpu->register cpu)
+            total-cycles (+ total-cycles cost)
+            data nil)
+      (cond
+       ;; LDA: Load Accumulator
+       ((eq sym :LDA)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op))
+              total-cycles (+ total-cycles penalty))
+        (setf (nes/cpu-register->acc register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; BNE
+       ((eq sym :BNE)
+        (unless (nes/cpu-register->sr-zero register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; JMP: Jump
+       ((eq sym :JMP)
+        (setf (nes/cpu-register->pc (nes/cpu->register cpu)) op))
+       ;; INX: Increment X Register
+       ((eq sym :INX)
+        (setq data (logand (1+ (nes/cpu-register->idx-x register)) #xff))
+        (setf (nes/cpu-register->idx-x register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; BPL
+       ((eq sym :BPL)
+        (unless (nes/cpu-register->sr-negative register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; CMP: Compare
+       ((eq sym :CMP)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let ((compared (- (nes/cpu-register->acc register) data)))
+          (nes/instruction--set-zero-and-negative-flags register compared)
+          (setf (nes/cpu-register->sr-carry register) (>= compared 0))))
+       ;; BMI
+       ((eq sym :BMI)
+        (when (nes/cpu-register->sr-negative register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; BEQ
+       ((eq sym :BEQ)
+        (when (nes/cpu-register->sr-zero register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; BIT
+       ((eq sym :BIT)
+        (setq data (nes/cpu-read cpu op))
+        (setf (nes/cpu-register->sr-negative register) (nes--logbitp 7 data)
+              (nes/cpu-register->sr-overflow register) (nes--logbitp 6 data)
+              (nes/cpu-register->sr-zero register) (zerop (logand (nes/cpu-register->acc register) data))))
+       ;; STA: Store Accumulator
+       ((eq sym :STA)
+        (nes/cpu-write cpu op (nes/cpu-register->acc (nes/cpu->register cpu))))
+       ;; DEX: Decrement X Register
+       ((eq sym :DEX)
+        (setq data (logand (1- (nes/cpu-register->idx-x register)) #xff))
+        (setf (nes/cpu-register->idx-x register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; INY: Increment Y Register
+       ((eq sym :INY)
+        (setq data (logand (1+ (nes/cpu-register->idx-y register)) #xff))
+        (setf (nes/cpu-register->idx-y register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; TAY: Transfer Accumulator to Y
+       ((eq sym :TAY)
+        (setq data (nes/cpu-register->acc register))
+        (setf (nes/cpu-register->idx-y register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; LDX: Load X Register
+       ((eq sym :LDX)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op))
+              total-cycles (+ total-cycles penalty))
+        (setf (nes/cpu-register->idx-x register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; LDY: Load Y Register
+       ((eq sym :LDY)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op))
+              total-cycles (+ total-cycles penalty))
+        (setf (nes/cpu-register->idx-y register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; STX: Store X Register
+       ((eq sym :STX)
+        (nes/cpu-write cpu op (nes/cpu-register->idx-x (nes/cpu->register cpu))))
+       ;; STY: Store Y Register
+       ((eq sym :STY)
+        (nes/cpu-write cpu op (nes/cpu-register->idx-y (nes/cpu->register cpu))))
+       ;; TAX: Transfer Accumulator to X
+       ((eq sym :TAX)
+        (setq data (nes/cpu-register->acc register))
+        (setf (nes/cpu-register->idx-x register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; TSX: Transfer Stack Pointer to X
+       ((eq sym :TSX)
+        (setq data (nes/cpu-register->sp register))
+        (setf (nes/cpu-register->idx-x register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; TXA: Transfer X to Accumulator
+       ((eq sym :TXA)
+        (setq data (nes/cpu-register->idx-x register))
+        (setf (nes/cpu-register->acc register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; TXS: Transfer X to Stack Pointer
+       ((eq sym :TXS)
+        (setf (nes/cpu-register->sp register)
+              (nes/cpu-register->idx-x register)))
+       ;; TYA: Transfer Y to Accumulator
+       ((eq sym :TYA)
+        (setq data (nes/cpu-register->idx-y register))
+        (setf (nes/cpu-register->acc register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; PHP: Push Processor Status
+       ;; In the byte pushed, bit 5 is always set to 1, and bit 4 is 1 if from an instruction (PHP or BRK)
+       ;; see https://wiki.nesdev.com/w/index.php/Status_flags#The_B_flag
+       ((eq sym :PHP)
+        (let ((old-break (nes/cpu-register->sr-break register))
+              (old-reserved (nes/cpu-register->sr-reserved register)))
+          (setf (nes/cpu-register->sr-break register) t
+                (nes/cpu-register->sr-reserved register) t)
+          (nes/cpu-push-status-register cpu)
+          (setf (nes/cpu-register->sr-break register) old-break
+                (nes/cpu-register->sr-reserved register) old-reserved)))
+       ;; PHA: Push Accumulator
+       ((eq sym :PHA)
+        (nes/cpu-push cpu (nes/cpu-register->acc (nes/cpu->register cpu))))
+       ;; PLA: Pull Accumulator
+       ((eq sym :PLA)
+        (setq data (nes/cpu-pull cpu))
+        (setf (nes/cpu-register->acc register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; PLP: Pull Processor Status
+       ;; Two instructions (PLP and RTI) pull a byte from the stack and set all the flags. They ignore bits 5 and 4.
+       ;; see https://wiki.nesdev.com/w/index.php/Status_flags#The_B_flag
+       ((eq sym :PLP)
+        (let ((current-break (nes/cpu-register->sr-break register))
+              (current-reserved (nes/cpu-register->sr-reserved register)))
           (nes/cpu-pull-status-register cpu)
-          (setf (nes/cpu-register->sr-reserved register) t
-                (nes/cpu-register->pc register)
-                (logior (nes/cpu-pull cpu)
-                        (ash (nes/cpu-pull cpu) 8))))
-         ;; NOPD
-         ((eq sym :NOPD)
-          (setf (nes/cpu-register->pc register) (1+ (nes/cpu-register->pc register))))
-         ;; NOPI
-         ((eq sym :NOPI)
-          (setq total-cycles (+ total-cycles penalty)))
-         ;; LAX
-         ((eq sym :LAX)
-          (setq data (nes/cpu-read cpu op)
-                total-cycles (+ total-cycles penalty))
-          (setf (nes/cpu-register->idx-x register) data
-                (nes/cpu-register->acc register) data)
-          (nes/instruction--set-zero-and-negative-flags register data))
-         ;; SAX
-         ((eq sym :SAX)
-          (nes/cpu-write cpu op
-                         (logand (nes/cpu-register->acc register)
-                                 (nes/cpu-register->idx-x register))))
-         ;; DCP
-         ((eq sym :DCP)
-          (let ((operated (logand (1- (nes/cpu-read cpu op)) #xFF)))
-            (setf (nes/cpu-register->sr-negative register)
-                  (/= (logand (logand (- (nes/cpu-register->acc register) operated) #x1FF) #x80) 0)
-                  (nes/cpu-register->sr-zero register)
-                  (= (logand (- (nes/cpu-register->acc register) operated) #x1FF) 0))
-            (nes/cpu-write cpu op operated)))
-         ;; ISB
-         ((eq sym :ISB)
-          (setq data (logand (1+ (nes/cpu-read cpu op)) #xFF))
-          (let ((operated (+ (logand (lognot data) #xFF)
-                              (nes/cpu-register->acc register)
-                              (if (nes/cpu-register->sr-carry register) 1 0))))
-            (setf (nes/cpu-register->sr-overflow register)
-                  (and (zerop (logand (logxor (nes/cpu-register->acc register) data) #x80))
-                       (not (zerop (logand (logxor (nes/cpu-register->acc register) operated) #x80))))
-                  (nes/cpu-register->sr-carry register)
-                  (> operated #xFF))
-            (nes/instruction--set-zero-and-negative-flags register operated)
-            (setf (nes/cpu-register->acc register) (logand operated #xFF))
-            (nes/cpu-write cpu op data)))
-         ;; SLO
-         ((eq sym :SLO)
-          (setq data (nes/cpu-read cpu op))
+          (setf (nes/cpu-register->sr-break register) current-break
+                (nes/cpu-register->sr-reserved register) current-reserved)))
+       ;; SEC: Set Carry Flag
+       ((eq sym :SEC)
+        (setf (nes/cpu-register->sr-carry (nes/cpu->register cpu)) t))
+       ;; SED: Set Decimal Flag
+       ((eq sym :SED)
+        (setf (nes/cpu-register->sr-decimal (nes/cpu->register cpu)) t))
+       ;; SEI: Set Interrupt Disable
+       ((eq sym :SEI)
+        (setf (nes/cpu-register->sr-interrupt (nes/cpu->register cpu)) t))
+       ;; CLC: Clear Carry Flag
+       ((eq sym :CLC)
+        (setf (nes/cpu-register->sr-carry (nes/cpu->register cpu)) nil))
+       ;; CLD: Clear Decimal Mode
+       ((eq sym :CLD)
+        (setf (nes/cpu-register->sr-decimal (nes/cpu->register cpu)) nil))
+       ;; CLI: Clear Interrupt Disable
+       ((eq sym :CLI)
+        (setf (nes/cpu-register->sr-interrupt (nes/cpu->register cpu)) nil))
+       ;; CLV: Clear Overflow Flag
+       ((eq sym :CLV)
+        (setf (nes/cpu-register->sr-overflow (nes/cpu->register cpu)) nil))
+       ;; INC: Increment Memory
+       ((eq sym :INC)
+        (setq data (logand (1+ (nes/cpu-read cpu op)) #xff))
+        (nes/cpu-write cpu op data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; DEC: Decrement Memory
+       ((eq sym :DEC)
+        (setq data (logand (1- (nes/cpu-read cpu op)) #xff))
+        (nes/cpu-write cpu op data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; DEY: Decrement Y Register
+       ((eq sym :DEY)
+        (setq data (logand (1- (nes/cpu-register->idx-y register)) #xff))
+        (setf (nes/cpu-register->idx-y register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; ADC: Add with Carry
+       ((eq sym :ADC)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let* ((acc (nes/cpu-register->acc register))
+               (result (+ acc
+                          data
+                          (if (nes/cpu-register->sr-carry register)
+                              1 0))))
+          (nes/instruction--set-zero-and-negative-flags register result)
+          (setf (nes/cpu-register->sr-carry register) (> result #xff)
+                (nes/cpu-register->sr-overflow register) (and (not (nes--logbitp 7 (logxor acc data)))
+                                                              (nes--logbitp 7 (logxor acc result)))
+                (nes/cpu-register->acc register) (logand result #xFF))))
+       ;; SBC: Subtract with Carry
+       ((eq sym :SBC)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let* ((acc (nes/cpu-register->acc register))
+               (result (- acc
+                          data
+                          (if (nes/cpu-register->sr-carry register)
+                              0 1))))
+          (nes/instruction--set-zero-and-negative-flags register result)
+          (setf (nes/cpu-register->sr-carry register) (>= result 0)
+                (nes/cpu-register->sr-overflow register) (and (nes--logbitp 7 (logxor acc data))
+                                                              (nes--logbitp 7 (logxor acc result)))
+                (nes/cpu-register->acc register) (logand result #xFF))))
+       ;; CPX: Compare X Register
+       ((eq sym :CPX)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let ((compared (- (nes/cpu-register->idx-x register) data)))
+          (nes/instruction--set-zero-and-negative-flags register compared)
+          (setf (nes/cpu-register->sr-carry register) (>= compared 0))))
+       ;; CPY: Compare Y Register
+       ((eq sym :CPY)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let ((compared (- (nes/cpu-register->idx-y register) data)))
+          (nes/instruction--set-zero-and-negative-flags register compared)
+          (setf (nes/cpu-register->sr-carry register) (>= compared 0))))
+       ;; AND: Logical And
+       ((eq sym :AND)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let ((result (logand (nes/cpu-register->acc register) data)))
+          (nes/instruction--set-zero-and-negative-flags register result)
+          (setf (nes/cpu-register->acc register) (logand result #xff))))
+       ;; ORA: Logical Inclusive OR
+       ((eq sym :ORA)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let ((result (logior (nes/cpu-register->acc register) data)))
+          (nes/instruction--set-zero-and-negative-flags register result)
+          (setf (nes/cpu-register->acc register) (logand result #xff))))
+       ;; EOR: Exclusive OR
+       ((eq sym :EOR)
+        (setq data (if (eq mode :immediate) op (nes/cpu-read cpu op)))
+        (let ((result (logxor (nes/cpu-register->acc register) data)))
+          (nes/instruction--set-zero-and-negative-flags register result)
+          (setf (nes/cpu-register->acc register) (logand result #xff))))
+       ;; ASL: Arithmetic Shift Left
+       ((eq sym :ASL)
+        (setq data (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op)))
+        (let ((shifted (logand (ash data 1) #xff)))
           (setf (nes/cpu-register->sr-carry register) (nes--logbitp 7 data))
-          (setq data (logand (ash data 1) #xFF))
-          (setf (nes/cpu-register->acc register) (logior (nes/cpu-register->acc register) data)
-                (nes/cpu-register->sr-negative register) (nes--logbitp 7 (nes/cpu-register->acc register))
-                (nes/cpu-register->sr-zero register) (= (logand (nes/cpu-register->acc register) #xFF) 0))
-          (nes/cpu-write cpu op data))
-         ;; RLA
-         ((eq sym :RLA)
-          (setq data (+ (ash (nes/cpu-read cpu op) 1)
-                        (if (nes/cpu-register->sr-carry register) 1 0)))
-          (setf (nes/cpu-register->sr-carry register) (nes--logbitp 8 data)
-                (nes/cpu-register->acc register) (logand (logand (nes/cpu-register->acc register) data) #xFF)
-                (nes/cpu-register->sr-negative register) (nes--logbitp 7 (nes/cpu-register->acc register))
-                (nes/cpu-register->sr-zero register) (= (logand (nes/cpu-register->acc register) #xFF) 0))
-          (nes/cpu-write cpu op data))
-         ;; SRE
-         ((eq sym :SRE)
-          (setq data (nes/cpu-read cpu op))
+          (nes/instruction--set-zero-and-negative-flags register shifted)
+          (if (eq mode :accumulator)
+              (setf (nes/cpu-register->acc register) shifted)
+            (nes/cpu-write cpu op shifted))))
+       ;; LSR: Logical Shift Right
+       ((eq sym :LSR)
+        (setq data (logand (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op))))
+        (let ((shifted (logand (ash data -1) #xff)))
           (setf (nes/cpu-register->sr-carry register) (nes--logbitp 0 data))
-          (setq data (ash data -1))
-          (setf (nes/cpu-register->acc register) (logxor (nes/cpu-register->acc register) data)
-                (nes/cpu-register->sr-negative register) (nes--logbitp 7 (nes/cpu-register->acc register))
-                (nes/cpu-register->sr-zero register) (= (logand (nes/cpu-register->acc register) #xFF) 0))
-          (nes/cpu-write cpu op data))
-         ;; RRA
-         ((eq sym :RRA)
-          (setq data (nes/cpu-read cpu op))
-          (let ((carry (nes--logbitp 0 data))
-                operated)
-            (setq data (logior (ash data -1)
-                               (if (nes/cpu-register->sr-carry register) #x80 #x00))
-                  operated (+ data (nes/cpu-register->acc register) (if carry 1 0)))
-            (setf (nes/cpu-register->sr-overflow register) (and (not (nes--logbitp 7 (logxor (nes/cpu-register->acc register) data)))
-                                                                (nes--logbitp 7 (logxor (nes/cpu-register->acc register) operated)))
-                  (nes/cpu-register->sr-carry register) (> operated #xFF)
-                  (nes/cpu-register->sr-negative register) (nes--logbitp 7 operated)
-                  (nes/cpu-register->sr-zero register) (= (logand operated #xFF) 0)
-                  (nes/cpu-register->acc register) (logand operated #xFF))
-            (nes/cpu-write cpu op data)))
-         (t (user-error "Unable to handle unknown opcode #x%02X" opcode)))))
+          (nes/instruction--set-zero-and-negative-flags register shifted)
+          (if (eq mode :accumulator)
+              (setf (nes/cpu-register->acc register) shifted)
+            (nes/cpu-write cpu op shifted))))
+       ;; ROL: Rotate Left
+       ((eq sym :ROL)
+        (setq data (logand (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op))))
+        (let* ((carry (nes/cpu-register->sr-carry register))
+               (rotated (logand #xff
+                                (logior (ash data 1) (if carry #x01 #x00)))))
+          (setf (nes/cpu-register->sr-carry register) (nes--logbitp 7 data))
+          (nes/instruction--set-zero-and-negative-flags register rotated)
+          (if (eq mode :accumulator)
+              (setf (nes/cpu-register->acc register) rotated)
+            (nes/cpu-write cpu op rotated))))
+       ;; ROR: Rotate Right
+       ((eq sym :ROR)
+        (setq data (logand (if (eq mode :accumulator) (nes/cpu-register->acc register) (nes/cpu-read cpu op))))
+        (let* ((carry (nes/cpu-register->sr-carry register))
+               (rotated (logand #xff
+                                (logior (ash data -1) (if carry #x80 #x00)))))
+          (setf (nes/cpu-register->sr-carry register) (/= (logand data #x01) 0))
+          (nes/instruction--set-zero-and-negative-flags register rotated)
+          (if (eq mode :accumulator)
+              (setf (nes/cpu-register->acc register) rotated)
+            (nes/cpu-write cpu op rotated))))
+       ;; NOP: No Operation
+       ((eq sym :NOP)
+        ;; doesn nothing?
+        '())
+       ;; BVS
+       ((eq sym :BVS)
+        (when (nes/cpu-register->sr-overflow register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; BVC
+       ((eq sym :BVC)
+        (unless (nes/cpu-register->sr-overflow register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; BCS
+       ((eq sym :BCS)
+        (when (nes/cpu-register->sr-carry register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; BCC
+       ((eq sym :BCC)
+        (unless (nes/cpu-register->sr-carry register)
+          (setq total-cycles (+ total-cycles 1 penalty))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; BRK
+       ((eq sym :BRK)
+        (let ((interrupt (nes/cpu-register->sr-interrupt register)))
+          (setf (nes/cpu-register->sr-break register) t)
+          (cl-incf (nes/cpu-register->pc register))
+          (nes/cpu-push cpu (logand #xFF (ash (nes/cpu-register->pc register) -8)))
+          (nes/cpu-push cpu (logand #xFF (nes/cpu-register->pc register)))
+          (nes/cpu-push-status-register cpu)
+          (unless interrupt
+            (setf (nes/cpu-register->sr-interrupt register) t
+                  (nes/cpu-register->pc register) (nes/cpu-read cpu #xFFFE :word)))
+          (cl-decf (nes/cpu-register->pc register))))
+       ;; JSR
+       ((eq sym :JSR)
+        (let ((pc (1- (nes/cpu-register->pc register))))
+          (nes/cpu-push cpu (logand (ash pc -8) #xFF))
+          (nes/cpu-push cpu (logand pc #xFF))
+          (setf (nes/cpu-register->pc register) op)))
+       ;; RTS
+       ((eq sym :RTS)
+        (setf (nes/cpu-register->pc register) (1+ (logior (nes/cpu-pull cpu)
+                                                          (ash (nes/cpu-pull cpu) 8)))))
+       ;; RTI
+       ((eq sym :RTI)
+        (nes/cpu-pull-status-register cpu)
+        (setf (nes/cpu-register->sr-reserved register) t
+              (nes/cpu-register->pc register)
+              (logior (nes/cpu-pull cpu)
+                      (ash (nes/cpu-pull cpu) 8))))
+       ;; NOPD
+       ((eq sym :NOPD)
+        (setf (nes/cpu-register->pc register) (1+ (nes/cpu-register->pc register))))
+       ;; NOPI
+       ((eq sym :NOPI)
+        (setq total-cycles (+ total-cycles penalty)))
+       ;; LAX
+       ((eq sym :LAX)
+        (setq data (nes/cpu-read cpu op)
+              total-cycles (+ total-cycles penalty))
+        (setf (nes/cpu-register->idx-x register) data
+              (nes/cpu-register->acc register) data)
+        (nes/instruction--set-zero-and-negative-flags register data))
+       ;; SAX
+       ((eq sym :SAX)
+        (nes/cpu-write cpu op
+                       (logand (nes/cpu-register->acc register)
+                               (nes/cpu-register->idx-x register))))
+       ;; DCP
+       ((eq sym :DCP)
+        (let ((operated (logand (1- (nes/cpu-read cpu op)) #xFF)))
+          (setf (nes/cpu-register->sr-negative register)
+                (/= (logand (logand (- (nes/cpu-register->acc register) operated) #x1FF) #x80) 0)
+                (nes/cpu-register->sr-zero register)
+                (= (logand (- (nes/cpu-register->acc register) operated) #x1FF) 0))
+          (nes/cpu-write cpu op operated)))
+       ;; ISB
+       ((eq sym :ISB)
+        (setq data (logand (1+ (nes/cpu-read cpu op)) #xFF))
+        (let ((operated (+ (logand (lognot data) #xFF)
+                           (nes/cpu-register->acc register)
+                           (if (nes/cpu-register->sr-carry register) 1 0))))
+          (setf (nes/cpu-register->sr-overflow register)
+                (and (zerop (logand (logxor (nes/cpu-register->acc register) data) #x80))
+                     (not (zerop (logand (logxor (nes/cpu-register->acc register) operated) #x80))))
+                (nes/cpu-register->sr-carry register)
+                (> operated #xFF))
+          (nes/instruction--set-zero-and-negative-flags register operated)
+          (setf (nes/cpu-register->acc register) (logand operated #xFF))
+          (nes/cpu-write cpu op data)))
+       ;; SLO
+       ((eq sym :SLO)
+        (setq data (nes/cpu-read cpu op))
+        (setf (nes/cpu-register->sr-carry register) (nes--logbitp 7 data))
+        (setq data (logand (ash data 1) #xFF))
+        (setf (nes/cpu-register->acc register) (logior (nes/cpu-register->acc register) data)
+              (nes/cpu-register->sr-negative register) (nes--logbitp 7 (nes/cpu-register->acc register))
+              (nes/cpu-register->sr-zero register) (= (logand (nes/cpu-register->acc register) #xFF) 0))
+        (nes/cpu-write cpu op data))
+       ;; RLA
+       ((eq sym :RLA)
+        (setq data (+ (ash (nes/cpu-read cpu op) 1)
+                      (if (nes/cpu-register->sr-carry register) 1 0)))
+        (setf (nes/cpu-register->sr-carry register) (nes--logbitp 8 data)
+              (nes/cpu-register->acc register) (logand (logand (nes/cpu-register->acc register) data) #xFF)
+              (nes/cpu-register->sr-negative register) (nes--logbitp 7 (nes/cpu-register->acc register))
+              (nes/cpu-register->sr-zero register) (= (logand (nes/cpu-register->acc register) #xFF) 0))
+        (nes/cpu-write cpu op data))
+       ;; SRE
+       ((eq sym :SRE)
+        (setq data (nes/cpu-read cpu op))
+        (setf (nes/cpu-register->sr-carry register) (nes--logbitp 0 data))
+        (setq data (ash data -1))
+        (setf (nes/cpu-register->acc register) (logxor (nes/cpu-register->acc register) data)
+              (nes/cpu-register->sr-negative register) (nes--logbitp 7 (nes/cpu-register->acc register))
+              (nes/cpu-register->sr-zero register) (= (logand (nes/cpu-register->acc register) #xFF) 0))
+        (nes/cpu-write cpu op data))
+       ;; RRA
+       ((eq sym :RRA)
+        (setq data (nes/cpu-read cpu op))
+        (let ((carry (nes--logbitp 0 data))
+              operated)
+          (setq data (logior (ash data -1)
+                             (if (nes/cpu-register->sr-carry register) #x80 #x00))
+                operated (+ data (nes/cpu-register->acc register) (if carry 1 0)))
+          (setf (nes/cpu-register->sr-overflow register) (and (not (nes--logbitp 7 (logxor (nes/cpu-register->acc register) data)))
+                                                              (nes--logbitp 7 (logxor (nes/cpu-register->acc register) operated)))
+                (nes/cpu-register->sr-carry register) (> operated #xFF)
+                (nes/cpu-register->sr-negative register) (nes--logbitp 7 operated)
+                (nes/cpu-register->sr-zero register) (= (logand operated #xFF) 0)
+                (nes/cpu-register->acc register) (logand operated #xFF))
+          (nes/cpu-write cpu op data)))
+       (t (user-error "Unable to handle unknown opcode #x%02X" opcode))))
     total-cycles))
 
 (provide 'nes-cpu)
